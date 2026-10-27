@@ -9,3 +9,8 @@ dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Private local notes
+[Nn]otes [Pp]enting/
+[Nn]otes*/
+*.private.md
