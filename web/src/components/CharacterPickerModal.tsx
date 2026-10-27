@@ -11,7 +11,7 @@ interface CharacterPickerModalProps {
   onSelectCharacter: (char: CharacterName) => void;
   selectedChar: CharacterName;
   title: string;
-  role: 'p1' | 'p2';
+  role?: 'p1' | 'p2';
   pickerType?: 'moves' | 'throws';
 }
 
@@ -25,6 +25,8 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
   pickerType = 'moves',
 }) => {
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'moves'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Reset search when modal opens/closes
   useEffect(() => {
@@ -42,6 +44,15 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const handleToggleSort = (type: 'name' | 'moves') => {
+    if (sortBy === type) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(type);
+      setSortOrder(type === 'name' ? 'asc' : 'desc');
+    }
+  };
+
   const filteredChars = useMemo(() => {
     let list = CHARACTERS;
     if (search.trim()) {
@@ -53,13 +64,19 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
           c.title.toLowerCase().includes(q)
       );
     }
-    if (pickerType === 'throws') {
-      return [...list].sort(
-        (a, b) => getThrowCountForCharacter(b.name) - getThrowCountForCharacter(a.name)
-      );
-    }
-    return list;
-  }, [search, pickerType]);
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'name') {
+        const comp = a.name.localeCompare(b.name);
+        return sortOrder === 'asc' ? comp : -comp;
+      } else {
+        const countA = pickerType === 'throws' ? getThrowCountForCharacter(a.name) : (CHARACTER_DATA[a.name]?.length || 0);
+        const countB = pickerType === 'throws' ? getThrowCountForCharacter(b.name) : (CHARACTER_DATA[b.name]?.length || 0);
+        const comp = countB - countA; // default moves: descending (most moves first)
+        return sortOrder === 'asc' ? -comp : comp;
+      }
+    });
+  }, [search, pickerType, sortBy, sortOrder]);
 
   if (!isOpen) return null;
 
@@ -82,7 +99,7 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
           </button>
         </div>
 
-        {/* Search Input */}
+        {/* Search Input (autoFocus removed to prevent Android soft-keyboard popup) */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={15} style={{ position: 'absolute', left: 12, color: 'var(--text-muted)' }} />
           <input
@@ -92,7 +109,6 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ paddingLeft: 36, paddingRight: 32, fontSize: '0.85rem' }}
-            autoFocus
           />
           {search && (
             <button
@@ -110,6 +126,30 @@ export const CharacterPickerModal: React.FC<CharacterPickerModalProps> = ({
               <X size={14} />
             </button>
           )}
+        </div>
+
+        {/* Sort Bar: Nama ▼ | Gerakan ▼ */}
+        <div className="picker-sort-bar">
+          <span className="sort-label">Urutkan:</span>
+          <div className="sort-actions">
+            <button
+              type="button"
+              className={`btn-sort-toggle ${sortBy === 'name' ? 'is-active' : ''}`}
+              onClick={() => handleToggleSort('name')}
+            >
+              <span>Nama</span>
+              <span className="sort-arrow">{sortBy === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : '▼'}</span>
+            </button>
+            <span className="sort-sep">|</span>
+            <button
+              type="button"
+              className={`btn-sort-toggle ${sortBy === 'moves' ? 'is-active' : ''}`}
+              onClick={() => handleToggleSort('moves')}
+            >
+              <span>{pickerType === 'throws' ? 'Grab' : 'Gerakan'}</span>
+              <span className="sort-arrow">{sortBy === 'moves' ? (sortOrder === 'asc' ? '▲' : '▼') : '▼'}</span>
+            </button>
+          </div>
         </div>
 
         {/* 35 Character List (Scrollable) */}

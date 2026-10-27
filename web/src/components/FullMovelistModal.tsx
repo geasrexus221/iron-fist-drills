@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { Move, CharacterName } from '../types/tekken';
 import { CHARACTER_DATA } from '../data';
-import { matchesMoveQuery } from '../utils/notation';
+import { matchesMoveQuery, formatStartup } from '../utils/notation';
 import { isThrowMove } from '../utils/engine';
 import { useDeviceType } from '../hooks/useDeviceType';
 import { Search, X, Rocket, ArrowLeft, Shield } from 'lucide-react';
@@ -254,7 +254,7 @@ export const FullMovelistModal: React.FC<FullMovelistModalProps> = ({
                   <div className="row-right">
                     <div className="row-frames">
                       <div className="frame-stat">
-                        <span className="frame-val">{m.startup || 'N/A'}</span>
+                        <span className="frame-val">{formatStartup(m.startup, m.startup_num)}</span>
                         <span className="frame-lbl">Startup</span>
                       </div>
                       <div className="frame-stat">

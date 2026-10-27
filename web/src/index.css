@@ -183,3 +183,105 @@ button {
 .animate-slide-up {
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Android font scaling & compact layout optimization */
+.is-android {
+  font-size: 14px;
+}
+
+.is-android .setup-title {
+  font-size: 1.1rem !important;
+}
+
+.is-android .setup-section-title {
+  font-size: 0.68rem !important;
+}
+
+.is-android .char-hero-name {
+  font-size: 1.05rem !important;
+}
+
+.is-android .scope-chip,
+.is-android .modifier-chip,
+.is-android .format-chip,
+.is-android .bracket-chip {
+  font-size: 0.72rem !important;
+  padding: 6px 8px !important;
+  min-height: 32px !important;
+}
+
+.is-android .btn-start-drill,
+.is-android .btn-start-session {
+  font-size: 0.88rem !important;
+  padding: 10px 14px !important;
+}
+
+.is-android .btn-back {
+  font-size: 0.76rem !important;
+  padding: 4px 10px !important;
+}
+
+/* Thin Scrollbars for Mobile & Android */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 3px !important;
+    height: 3px !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-radius: 2px !important;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  * {
+    scrollbar-width: thin !important;
+  }
+}
+
+.is-android ::-webkit-scrollbar,
+.is-android *::-webkit-scrollbar {
+  width: 3px !important;
+  height: 3px !important;
+}
+
+.is-android ::-webkit-scrollbar-thumb,
+.is-android *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-radius: 2px !important;
+}
+
+.is-android,
+.is-android * {
+  scrollbar-width: thin !important;
+}
+
+/* Universal Center Alignment for All Modals / Popups */
+.modal-backdrop,
+.info-modal-overlay,
+.session-summary-overlay,
+.picker-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 9999 !important;
+  padding: 16px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.modal-content,
+.info-modal-card,
+.session-summary-card,
+.picker-modal-card,
+.settings-modal-card,
+.video-modal-card,
+.sheet-modal-card {
+  margin: auto !important;
+  max-height: 88vh !important;
+  border-radius: var(--radius-md) !important;
+}
+
+

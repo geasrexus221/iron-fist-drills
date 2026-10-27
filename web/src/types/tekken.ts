@@ -77,6 +77,7 @@ export interface Move {
 export type QuizMode = "punishment" | "frame-trap" | "throw-break";
 export type InputFormat = "four-choices" | "full-movelist";
 export type MinusBracket = "all-moves" | "safe" | "10" | "11-12" | "13-14" | "15+";
+export type StringFilter = "all" | "1-hit" | "2-hits" | "3-hits" | "3+hits";
 
 export type ThrowBreakButton = "1" | "2" | "1+2";
 export type ThrowHandVisual = "left" | "right" | "both" | "trick";
@@ -106,12 +107,41 @@ export interface FrameTrapEvaluation {
   message: string;
 }
 
+export type SessionScope = "endless" | "gauntlet";
+
+export interface DrillModifiers {
+  sessionScope: SessionScope;
+  isSinglePlay: boolean;
+  isBlitzMode: boolean;
+  isSurvivalMode: boolean;
+  isBlindMode: boolean;
+}
+
+export interface SessionSummary {
+  status: "completed" | "game-over";
+  reason?: string;
+  totalAnswered: number;
+  correctCount: number;
+  optimalCount: number;
+  accuracy: number;
+  bestStreak: number;
+}
+
 export interface QuizQuestion {
   id: string;
   mode: QuizMode;
   userCharacter: CharacterName;
   opponentCharacter: CharacterName;
+  // Modifiers
+  sessionScope?: SessionScope;
+  gauntletIndex?: number;
+  gauntletTotal?: number;
+  isSinglePlay?: boolean;
+  isBlitzMode?: boolean;
+  isSurvivalMode?: boolean;
   isBlindMode?: boolean;
+  maxBlitzTime?: number;
+  stringFilter?: StringFilter;
   // For punishment mode:
   opponentMove?: Move;
   minusFrames?: number;

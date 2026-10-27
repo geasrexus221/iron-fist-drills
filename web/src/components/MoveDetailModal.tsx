@@ -2,18 +2,21 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { CharacterName, Move } from '../types/tekken';
 import {
-  X,
-  ArrowLeft,
-  Search,
-  Zap,
-  Shield,
-  CheckCircle2,
-  Flame,
-  ExternalLink,
-  Play,
-  Info,
-  Bookmark,
-} from 'lucide-react';
+  formatStartup,
+  getMoveAttributes,
+  detectStanceTransitions,
+  getCandidateStancePrefix,
+  isPlayerRecoveringCrouch,
+  isOpponentGrounded,
+  isOpponentForcedCrouch,
+  type DetailScenario,
+  detectSpecialCrouchHit,
+  detectCleanHit,
+  hasDistinctCounterHit,
+} from '../utils/notation';
+import { X, Play, ChevronUp, ChevronDown, Info, ArrowLeft } from 'lucide-react';
+import { AttributeGuideModal } from './AttributeGuideModal';
+import { OptionGuideModal } from './OptionGuideModal';
 
 export interface MoveDetailModalProps {
   move: Move;
@@ -25,8 +28,19 @@ export interface MoveDetailModalProps {
   onToggleFavorite?: (id: string) => void;
 }
 
-type FrameScenario = 'hit' | 'block' | 'ch';
-type FollowupFilter = 'all' | 'neutral' | 'favorites' | 'mid' | 'high' | 'low' | 'launcher' | 'clean-only';
+type SortField = 'input' | 'name' | 'startup';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  field: SortField;
+  direction: SortDirection;
+}
+
+interface ScenarioTabItem {
+  id: DetailScenario;
+  label: string;
+  highlight?: boolean;
+}
 
 export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
   move: initialMove,
@@ -34,48 +48,118 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
   characterName,
   onClose,
   onSelectMove,
-  favorites,
-  onToggleFavorite,
 }) => {
-  // Navigation stack to explore flowcharts
-  const [history, setHistory] = useState<Move[]>([initialMove]);
-  const currentMove = history[history.length - 1];
+  // Current active move inside the detail modal
+  const [currentMove, setCurrentMove] = useState<Move>(initialMove);
 
-  // Opponent reaction speed benchmark (default 10 = standard i10 jab)
-  const [opponentSpeed, setOpponentSpeed] = useState<number>(10);
+  // Navigation history to allow going back to previously inspected moves
+  const [history, setHistory] = useState<Move[]>([]);
 
-  // Filters for follow-ups
-  const [followupFilter, setFollowupFilter] = useState<FollowupFilter>('neutral');
-  const [searchFilter, setSearchFilter] = useState('');
-  const [visibleCount, setVisibleCount] = useState<number>(50);
-
-  // Video preview inside followup modal
-  const [previewVideo, setPreviewVideo] = useState<Move | null>(null);
-
-  // Synchronize when initialMove changes
+  // Sync state if initialMove prop changes
   useEffect(() => {
-    setHistory([initialMove]);
-    setSearchFilter('');
-    setFollowupFilter('neutral');
-    setVisibleCount(50);
+    setCurrentMove(initialMove);
+    setHistory([]);
   }, [initialMove.id]);
+
+  const handleSelectNewMove = (newMove: Move) => {
+    setHistory((prev) => [...prev, currentMove]);
+    setCurrentMove(newMove);
+    setActiveVideoMove(newMove);
+    setScenario('hit');
+    setStanceFilter('all');
+    onSelectMove?.(newMove);
+  };
+
+  const handleGoBack = () => {
+    if (history.length === 0) return;
+    const prevMove = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, prev.length - 1));
+    setCurrentMove(prevMove);
+    setActiveVideoMove(prevMove);
+    setScenario('hit');
+    setStanceFilter('all');
+    onSelectMove?.(prevMove);
+  };
+
+  // Scenario state: 'hit' (default), 'ch', 'crouch', 'clean', or 'block'
+  const [scenario, setScenario] = useState<DetailScenario>('hit');
+
+  // Move attributes
+  const currentMoveAttrs = useMemo(() => getMoveAttributes(currentMove), [currentMove]);
+
+  // Special scenario detections
+  const distinctCH = useMemo(() => hasDistinctCounterHit(currentMove), [currentMove]);
+  const specialCrouch = useMemo(() => detectSpecialCrouchHit(currentMove), [currentMove]);
+  const specialClean = useMemo(() => detectCleanHit(currentMove), [currentMove]);
+
+  // Dynamic scenario tabs
+  const scenarioTabs = useMemo<ScenarioTabItem[]>(() => {
+    const tabs: ScenarioTabItem[] = [
+      { id: 'hit', label: `On Hit (${currentMove.hit || 'N/A'})` },
+    ];
+
+    if (specialCrouch) {
+      tabs.push({
+        id: 'crouch',
+        label: `On Crouch (${specialCrouch.frame})`,
+        highlight: specialCrouch.isGuaranteed,
+      });
+    }
+
+    if (specialClean) {
+      tabs.push({
+        id: 'clean',
+        label: `Clean Hit (${specialClean.frame})`,
+      });
+    }
+
+    if (distinctCH) {
+      tabs.push({
+        id: 'ch',
+        label: `On CH (${currentMove.ch})`,
+      });
+    }
+
+    tabs.push({
+      id: 'block',
+      label: `On Block (${currentMove.block || 'N/A'})`,
+    });
+
+    return tabs;
+  }, [currentMove, distinctCH, specialCrouch, specialClean]);
+
+  // Attribute guide popup modal state
+  const [isAttrGuideOpen, setIsAttrGuideOpen] = useState(false);
+
+  // Option move guide popup modal state
+  const [isOptionGuideOpen, setIsOptionGuideOpen] = useState(false);
+
+  // Currently playing video move in the top player (defaults to the inspected move)
+  const [activeVideoMove, setActiveVideoMove] = useState<Move>(currentMove);
+
+  // Sorting state for the 3-column table
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ field: 'startup', direction: 'asc' });
+
+  // Update active video when currentMove changes
+  useEffect(() => {
+    setActiveVideoMove(currentMove);
+    setScenario('hit');
+    setSortConfig({ field: 'startup', direction: 'asc' });
+    setStanceFilter('all');
+  }, [currentMove.id]);
 
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (previewVideo) {
-          setPreviewVideo(null);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [previewVideo, onClose]);
+  }, [onClose]);
 
-  // Parse numerical advantage from move fields
+  // Parse numeric frame advantage from string or number field
   const parseNum = (valStr?: string | null, valNum?: number | null): number | null => {
     if (valNum !== null && valNum !== undefined) return valNum;
     if (!valStr) return null;
@@ -85,580 +169,486 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
 
   const hitAdvantage = parseNum(currentMove.hit, currentMove.hit_num);
   const blockAdvantage = parseNum(currentMove.block, currentMove.block_num);
-  const chAdvantage = parseNum(currentMove.ch, currentMove.ch_num);
+  const chAdvantage = parseNum(currentMove.ch, currentMove.ch_num) ?? hitAdvantage;
 
-  // Default scenario selection: prefer positive advantage (hit or block)
-  const [scenario, setScenario] = useState<FrameScenario>(() => {
-    if (hitAdvantage !== null && hitAdvantage > 0) return 'hit';
-    if (blockAdvantage !== null && blockAdvantage > 0) return 'block';
-    if (hitAdvantage !== null) return 'hit';
-    if (blockAdvantage !== null) return 'block';
-    return 'hit';
-  });
-
-  useEffect(() => {
-    if (hitAdvantage !== null && hitAdvantage > 0) setScenario('hit');
-    else if (blockAdvantage !== null && blockAdvantage > 0) setScenario('block');
-    else if (hitAdvantage !== null) setScenario('hit');
-    else if (blockAdvantage !== null) setScenario('block');
-  }, [currentMove.id]);
-
-  // Active advantage based on scenario
   const currentAdvantage = useMemo(() => {
     if (scenario === 'hit') return hitAdvantage;
     if (scenario === 'block') return blockAdvantage;
     if (scenario === 'ch') return chAdvantage;
-    return null;
-  }, [scenario, hitAdvantage, blockAdvantage, chAdvantage]);
+    if (scenario === 'crouch') return specialCrouch?.frameNum ?? hitAdvantage;
+    if (scenario === 'clean') return specialClean?.frameNum ?? hitAdvantage;
+    return hitAdvantage;
+  }, [scenario, hitAdvantage, blockAdvantage, chAdvantage, specialCrouch, specialClean]);
 
-  // Max startup of player's move that beats or trades with opponent
-  // Opponent attack lands at: advantage + opponentSpeed
-  const opponentArrival = currentAdvantage !== null ? currentAdvantage + opponentSpeed : null;
+  // Sub-filter for stance when transition is optional: 'all' | 'normal' | 'stance'
+  const [stanceFilter, setStanceFilter] = useState<'all' | 'normal' | 'stance'>('all');
 
-  // Calculate available follow-ups
-  const followups = useMemo(() => {
+  // Situational state checks
+  const transitions = useMemo(() => detectStanceTransitions(currentMove), [currentMove]);
+  const hasMandatoryStance = useMemo(() => transitions.some((t) => !t.isOptional), [transitions]);
+  const accessibleStanceCodes = useMemo(() => new Set(transitions.map((t) => t.stance)), [transitions]);
+
+  const isPlayerCrouch = useMemo(() => isPlayerRecoveringCrouch(currentMove), [currentMove]);
+  const isGrounded = useMemo(() => isOpponentGrounded(currentMove, scenario), [currentMove, scenario]);
+  const isForcedCrouch = useMemo(() => isOpponentForcedCrouch(currentMove, scenario), [currentMove, scenario]);
+
+  // Opponent fastest response:
+  // If opponent is forced into crouch (FC), fastest response is i11 (ws+4)
+  // Otherwise, fastest response is i10 standing jab
+  const opponentFastest = isForcedCrouch ? 11 : 10;
+  const opponentArrival = currentAdvantage !== null ? currentAdvantage + opponentFastest : null;
+
+  // Filter valid moves for the selected scenario
+  const validMoves = useMemo(() => {
+    // If no advantage data, or in severe disadvantage (< 10), no follow-up beats opponent's response
     if (currentAdvantage === null || opponentArrival === null || opponentArrival < 10) {
       return [];
     }
 
-    return allCharacterMoves
-      .filter((m) => {
-        // Exclude current move itself if identical
-        if (m.id === currentMove.id) return false;
-        if (!m.startup_num) return false;
+    return allCharacterMoves.filter((m) => {
+      // 1. Exclude self
+      if (m.id === currentMove.id) return false;
+      if (!m.startup_num) return false;
 
-        // Must start up within the arrival window
-        return m.startup_num >= 10 && m.startup_num <= opponentArrival;
-      })
-      .map((m) => {
-        const diff = opponentArrival - (m.startup_num || 10);
-        return {
-          move: m,
-          diff,
-          isCleanBeat: diff > 0,
-          isTrade: diff === 0,
-        };
-      })
-      .sort((a, b) => {
-        // Sort by startup speed (fastest first), then by damage
-        if ((a.move.startup_num || 0) !== (b.move.startup_num || 0)) {
-          return (a.move.startup_num || 0) - (b.move.startup_num || 0);
-        }
-        return (parseInt(b.move.damage || '0') || 0) - (parseInt(a.move.damage || '0') || 0);
-      });
-  }, [allCharacterMoves, currentMove, currentAdvantage, opponentArrival]);
+      // 2. Check startup window
+      if (m.startup_num < 10 || m.startup_num > opponentArrival) return false;
 
-  // Apply filters on followups
-  const filteredFollowups = useMemo(() => {
-    return followups.filter((item) => {
-      const m = item.move;
+      // 3. Stance & Posture Filtering
+      const candStance = getCandidateStancePrefix(m.input);
 
-      // Text search
-      if (searchFilter) {
-        const q = searchFilter.toLowerCase();
-        const matchesInput = m.input.toLowerCase().includes(q);
-        const matchesName = m.name.toLowerCase().includes(q);
-        if (!matchesInput && !matchesName) return false;
+      // 3A. Special system prefixes:
+      // Heat moves ("H.") require active heat state
+      if (candStance === 'H') return false;
+      // Rage Art ("R.") is an emergency mechanic, not standard frame trap
+      if (candStance === 'R') return false;
+      // OTG moves ("OTG.") require opponent to be grounded
+      if (candStance === 'OTG') {
+        if (!isGrounded) return false;
       }
 
-      // Category filters
-      if (followupFilter === 'neutral') {
-        const inp = m.input;
-        const isStringFollowup = inp.startsWith(currentMove.input + ',');
-        if (isStringFollowup) return false;
-      } else if (followupFilter === 'clean-only') {
-        if (!item.isCleanBeat) return false;
-      } else if (followupFilter === 'mid') {
-        if (!m.is_mid && !m.target?.toLowerCase().includes('m')) return false;
-      } else if (followupFilter === 'high') {
-        if (!m.is_high && !m.target?.toLowerCase().includes('h')) return false;
-      } else if (followupFilter === 'low') {
-        if (!m.is_low && !m.target?.toLowerCase().includes('l')) return false;
-      } else if (followupFilter === 'launcher') {
-        if (!m.is_launcher) return false;
-      } else if (followupFilter === 'favorites') {
-        if (!favorites?.has(m.id)) return false;
+      // 3B. Named Character Stances (FUJ, ZEN, WRA, SEN, FLK, MNT, etc.):
+      const isNamedStance =
+        candStance !== null &&
+        candStance !== 'WS' &&
+        candStance !== 'FC' &&
+        candStance !== 'SS' &&
+        candStance !== 'BT' &&
+        candStance !== 'H' &&
+        candStance !== 'R' &&
+        candStance !== 'OTG';
+
+      if (isNamedStance) {
+        // Candidate move requires a named stance.
+        // It can ONLY be executed if the current move has a transition to this stance!
+        if (!accessibleStanceCodes.has(candStance)) return false;
+      }
+
+      // 3C. Back-Turned & Side-Step
+      if (candStance === 'BT' && !accessibleStanceCodes.has('BT')) return false;
+      if (candStance === 'SS' && !accessibleStanceCodes.has('SS')) return false;
+
+      // 3D. Posture: Standing vs Crouching
+      if (!isPlayerCrouch) {
+        // Player is STANDING:
+        // Exclude While Standing ("ws") and Full Crouch ("fc") moves
+        if (candStance === 'WS' || candStance === 'FC') return false;
+        // If the current move forces a MANDATORY stance, player cannot perform normal standing moves
+        if (hasMandatoryStance && candStance === null) return false;
+      } else {
+        // Player is CROUCHING:
+        // While Standing and Full Crouch are allowed!
+        // Neutral moves without prefix must be crouch-accessible (e.g. d+, db+, df+)
+        if (candStance === null) {
+          const isDownInput = /^(?:d[\+\/,]|db|df)/i.test(m.input);
+          if (!isDownInput) return false;
+        }
+      }
+
+      // 4. Opponent Posture Filtering (Crouching, Force Crouch, or Grounded):
+      // Serangan High 100% whiff jika lawan sedang menunduk (crouch/Force Crouch) atau terjatuh di lantai (grounded).
+      // Hanya serangan Mid, Low, dan Special Mid yang dapat mengenai lawan.
+      const isOpponentDuckingOrDown = isGrounded || scenario === 'crouch' || isForcedCrouch;
+      if (isOpponentDuckingOrDown) {
+        const targetLower = (m.target || '').toLowerCase();
+        const firstTarget = targetLower.split(/[,/]/)[0].trim();
+        if (firstTarget === 'h' || firstTarget === 'high') {
+          return false;
+        }
       }
 
       return true;
     });
-  }, [followups, followupFilter, searchFilter, currentMove]);
+  }, [allCharacterMoves, currentMove.id, currentAdvantage, opponentArrival, accessibleStanceCodes, hasMandatoryStance, isPlayerCrouch, isGrounded, scenario, isForcedCrouch]);
 
-  const displayedFollowups = useMemo(() => {
-    return filteredFollowups.slice(0, visibleCount);
-  }, [filteredFollowups, visibleCount]);
+  const normalMovesCount = useMemo(() => {
+    return validMoves.filter((m) => getCandidateStancePrefix(m.input) === null).length;
+  }, [validMoves]);
 
-  // Navigate to inspect a follow-up move
-  const handleInspectMove = (m: Move) => {
-    setHistory((prev) => [...prev, m]);
-    setSearchFilter('');
-    setFollowupFilter('neutral');
-    setVisibleCount(50);
-    if (onSelectMove) {
-      onSelectMove(m);
+  const stanceMovesCount = useMemo(() => {
+    return validMoves.filter((m) => {
+      const p = getCandidateStancePrefix(m.input);
+      return p !== null && accessibleStanceCodes.has(p);
+    }).length;
+  }, [validMoves, accessibleStanceCodes]);
+
+  const filteredMoves = useMemo(() => {
+    if (stanceFilter === 'normal') {
+      return validMoves.filter((m) => getCandidateStancePrefix(m.input) === null);
     }
-  };
+    if (stanceFilter === 'stance') {
+      return validMoves.filter((m) => {
+        const p = getCandidateStancePrefix(m.input);
+        return p !== null && accessibleStanceCodes.has(p);
+      });
+    }
+    return validMoves;
+  }, [validMoves, stanceFilter, accessibleStanceCodes]);
 
-  const handleBackHistory = () => {
-    if (history.length > 1) {
-      const prevMove = history[history.length - 2];
-      setHistory((prev) => prev.slice(0, -1));
-      if (onSelectMove) {
-        onSelectMove(prevMove);
+  // Sort filtered moves
+  const sortedMoves = useMemo(() => {
+    if (!sortConfig) return filteredMoves;
+    const { field, direction } = sortConfig;
+    const factor = direction === 'asc' ? 1 : -1;
+
+    return [...filteredMoves].sort((a, b) => {
+      if (field === 'input') {
+        return factor * a.input.localeCompare(b.input, undefined, { numeric: true, sensitivity: 'base' });
       }
-    }
+      if (field === 'name') {
+        return factor * a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      }
+      if (field === 'startup') {
+        const sA = a.startup_num ?? 99;
+        const sB = b.startup_num ?? 99;
+        return factor * (sA - sB);
+      }
+      return 0;
+    });
+  }, [filteredMoves, sortConfig]);
+
+  const handleSort = (field: SortField) => {
+    setSortConfig((prev) => {
+      if (!prev || prev.field !== field) {
+        return { field, direction: 'asc' };
+      }
+      if (prev.direction === 'asc') {
+        return { field, direction: 'desc' };
+      }
+      return null;
+    });
   };
+
+  const renderSortIndicator = (field: SortField) => {
+    if (!sortConfig || sortConfig.field !== field) return null;
+    return (
+      <span className="th-sort-icon-wrap">
+        {sortConfig.direction === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+      </span>
+    );
+  };
+
+  const activeVideoUrl = activeVideoMove?.video_url;
 
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="sheet-modal-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        {/* Header Bar: Clean, Compact & Responsively Wrapping */}
-        <div className="sheet-header">
-          <div className="sheet-header-left">
-            {history.length > 1 && (
+      <div className="integrated-sheet-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        {/* Header: Move Name (Input) and Close Button */}
+        <div className="sheet-modal-header">
+          <div className="sheet-title-group">
+            {history.length > 0 && (
               <button
                 type="button"
                 className="btn-history-back"
-                onClick={handleBackHistory}
-                title="Kembali ke move sebelumnya"
+                onClick={handleGoBack}
+                title="Kembali ke gerakan sebelumnya"
               >
-                <ArrowLeft size={14} />
-                <span>Kembali</span>
+                <ArrowLeft size={16} />
               </button>
             )}
-            <span className="char-badge">{characterName}</span>
-            <div className="main-move-info">
-              <span className="main-move-input">{currentMove.input}</span>
-              <span className="main-move-name">{currentMove.name}</span>
-            </div>
-
-            {/* Quick Stats Strip */}
-            <div className="quick-stats-strip">
-              <span className="q-stat">
-                Startup: <strong className="text-cyan">{currentMove.startup || (currentMove.startup_num ? `i${currentMove.startup_num}` : '-')}</strong>
-              </span>
-              <span className="q-stat">
-                Block: <strong className={(currentMove.block_num ?? 0) > 0 ? 'text-cyan' : (currentMove.block_num ?? 0) <= -10 ? 'text-crimson' : 'text-amber'}>{currentMove.block || '-'}</strong>
-                {currentMove.block_tooltip && (
-                  <span className="wiki-tooltip-icon" title={currentMove.block_tooltip}>
-                    <Info size={9} />
-                  </span>
-                )}
-              </span>
-              <span className="q-stat">
-                Hit: <strong className={(currentMove.hit_num ?? 0) > 0 ? 'text-green' : 'text-secondary'}>{currentMove.hit || '-'}</strong>
-                {currentMove.hit_tooltip && (
-                  <span className="wiki-tooltip-icon" title={currentMove.hit_tooltip}>
-                    <Info size={9} />
-                  </span>
-                )}
-              </span>
-              {currentMove.ch && (
-                <span className="q-stat">
-                  CH: <strong className="text-gold">{currentMove.ch}</strong>
-                  {currentMove.ch_tooltip && (
-                    <span className="wiki-tooltip-icon" title={currentMove.ch_tooltip}>
-                      <Info size={9} />
-                    </span>
-                  )}
-                </span>
-              )}
-              <span className="q-stat">Dmg: <strong>{currentMove.damage || '-'}</strong></span>
-              {currentMove.target && <span className={`target-mini-pill target-${currentMove.target.toLowerCase()}`}>{currentMove.target}</span>}
-              {currentMove.is_launcher && <span className="launcher-mini-pill">Launcher</span>}
-            </div>
+            <span className="sheet-char-tag">{characterName}</span>
+            <span className="sheet-move-title">
+              {currentMove.name} <span className="sheet-move-input-highlight">({currentMove.input})</span>
+            </span>
           </div>
-
-          <button
-            type="button"
-            className="btn-sheet-close"
-            onClick={onClose}
-            title="Tutup (ESC)"
-          >
+          <button type="button" className="btn-close-modal" onClick={onClose} title="Tutup">
             <X size={18} />
           </button>
         </div>
 
-        {/* Controls Toolbar: Scenarios, Speed, Formula (Flows Downward on smaller screens) */}
-        <div className="sheet-toolbar">
-          <div className="toolbar-left">
-            <div className="scenario-pills">
-              <button
-                type="button"
-                className={`scenario-pill ${scenario === 'hit' ? 'active' : ''}`}
-                onClick={() => setScenario('hit')}
-                disabled={hitAdvantage === null}
-              >
-                <CheckCircle2 size={13} />
-                <span>On Hit ({currentMove.hit || 'N/A'})</span>
-              </button>
-              <button
-                type="button"
-                className={`scenario-pill ${scenario === 'block' ? 'active' : ''}`}
-                onClick={() => setScenario('block')}
-                disabled={blockAdvantage === null}
-              >
-                <Shield size={13} />
-                <span>On Block ({currentMove.block || 'N/A'})</span>
-              </button>
-              {chAdvantage !== null && (
-                <button
-                  type="button"
-                  className={`scenario-pill ${scenario === 'ch' ? 'active' : ''}`}
-                  onClick={() => setScenario('ch')}
-                >
-                  <Flame size={13} />
-                  <span>On CH ({currentMove.ch})</span>
-                </button>
+        {/* Video Player */}
+        <div className="sheet-video-container">
+          {activeVideoUrl ? (
+            <video
+              key={activeVideoUrl}
+              src={activeVideoUrl}
+              autoPlay
+              loop
+              muted
+              controls
+              playsInline
+              className="sheet-video-player"
+            />
+          ) : (
+            <div className="sheet-video-placeholder">
+              <span>Video tidak tersedia untuk gerakan ini</span>
+            </div>
+          )}
+          {activeVideoMove.id !== currentMove.id && (
+            <div className="playing-move-overlay-badge">
+              <span>Memutar: {activeVideoMove.name} ({activeVideoMove.input})</span>
+            </div>
+          )}
+        </div>
+
+        {/* Move Attributes (Stat Strip) */}
+        <div className="sheet-stat-strip">
+          <div className="sheet-stat-box">
+            <span className="stat-label">STARTUP</span>
+            <span className="stat-value text-cyan">{formatStartup(currentMove.startup, currentMove.startup_num)}</span>
+          </div>
+          <div className="sheet-stat-box">
+            <span className="stat-label">BLOCK</span>
+            <span className={`stat-value ${(currentMove.block_num ?? 0) < 0 ? 'text-crimson' : 'text-cyan'}`}>
+              {currentMove.block || 'N/A'}
+            </span>
+          </div>
+          <div className="sheet-stat-box sheet-stat-box-hit">
+            <span className="stat-label">HIT</span>
+            <div className="stat-value text-green stat-hit-multi">
+              <span>{currentMove.hit || 'N/A'}</span>
+              {specialCrouch && (
+                <>
+                  <span className="stat-separator"> | </span>
+                  <span className="stat-sub-val" title="On Crouch Hit">
+                    {specialCrouch.frame} <span className="stat-tag-suffix">(cr)</span>
+                  </span>
+                </>
+              )}
+              {distinctCH && currentMove.ch && (
+                <>
+                  <span className="stat-separator"> | </span>
+                  <span className="stat-sub-val text-ch-gold" title="Counter Hit">
+                    {currentMove.ch} <span className="stat-tag-suffix">(ch)</span>
+                  </span>
+                </>
               )}
             </div>
-
-            <div className="opp-speed-wrap">
-              <span className="opp-speed-label">vs Serangan Lawan:</span>
-              <select
-                value={opponentSpeed}
-                onChange={(e) => setOpponentSpeed(Number(e.target.value))}
-                className="opp-speed-select"
-              >
-                <option value={10}>i10 Jab (Standar Universal)</option>
-                <option value={11}>i11 ws4 / Magic 4</option>
-                <option value={12}>i12 Dickjab / Mid Check</option>
-                <option value={14}>i14 Mid Launcher</option>
-                <option value={15}>i15 Hopkick / Launcher</option>
-              </select>
-            </div>
           </div>
-
-          {currentAdvantage !== null && opponentArrival !== null && (
-            <div className="formula-inline">
-              <Zap size={13} className="text-amber" />
-              <span>
-                Keuntungan <strong className="text-green">+{currentAdvantage}F</strong> + Lawan <strong>i{opponentSpeed}</strong> = Lawan mendarat di <strong>Frame {opponentArrival}</strong>.
-                Rentang follow-up: <strong className="text-cyan">i10 s/d i{opponentArrival}</strong>
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Filter and Search Bar */}
-        <div className="sheet-filter-bar">
-          <div className="filter-chips-group">
-            <button
-              type="button"
-              className={`sheet-filter-chip ${followupFilter === 'neutral' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('neutral'); setVisibleCount(50); }}
-              title="Hanya gerakan pembuka netral (bukan lanjutan string dari move ini)"
-            >
-              Starter Mandiri
-            </button>
-            <button
-              type="button"
-              className={`sheet-filter-chip ${followupFilter === 'all' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('all'); setVisibleCount(50); }}
-            >
-              Semua Move ({followups.length})
-            </button>
-            <button
-              type="button"
-              className={`sheet-filter-chip chip-green ${followupFilter === 'clean-only' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('clean-only'); setVisibleCount(50); }}
-            >
-              Clean Beat
-            </button>
-            <button
-              type="button"
-              className={`sheet-filter-chip ${followupFilter === 'mid' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('mid'); setVisibleCount(50); }}
-            >
-              Mid (Anti-Duck)
-            </button>
-            <button
-              type="button"
-              className={`sheet-filter-chip ${followupFilter === 'launcher' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('launcher'); setVisibleCount(50); }}
-            >
-              Launcher
-            </button>
-            <button
-              type="button"
-              className={`sheet-filter-chip ${followupFilter === 'low' ? 'active' : ''}`}
-              onClick={() => { setFollowupFilter('low'); setVisibleCount(50); }}
-            >
-              Low Mixup
-            </button>
-            {favorites && favorites.size > 0 && (
+          <div className="sheet-stat-box">
+            <span className="stat-label">TARGET</span>
+            <span className="stat-value text-gold">{currentMove.target || '-'}</span>
+          </div>
+          <div className="sheet-stat-box sheet-stat-box-attr">
+            <div className="stat-label-wrap">
+              <span className="stat-label">ATRIBUT</span>
               <button
                 type="button"
-                className={`sheet-filter-chip chip-gold ${followupFilter === 'favorites' ? 'active' : ''}`}
-                onClick={() => { setFollowupFilter('favorites'); setVisibleCount(50); }}
+                className="btn-attr-info-trigger"
+                onClick={() => setIsAttrGuideOpen(true)}
+                title="Lihat penjelasan & kepanjangan lengkap seluruh atribut"
               >
-                <Bookmark size={12} fill={followupFilter === 'favorites' ? '#ffd700' : 'none'} />
-                Favorit Saja ({followups.filter((f) => favorites.has(f.move.id)).length})
+                <Info size={11} />
               </button>
-            )}
-          </div>
-
-          <div className="sheet-search-wrap">
-            <Search size={13} className="sheet-search-icon" />
-            <input
-              type="text"
-              className="sheet-search-input"
-              placeholder="Cari move follow-up..."
-              value={searchFilter}
-              onChange={(e) => { setSearchFilter(e.target.value); setVisibleCount(50); }}
-            />
-            {searchFilter && (
-              <button
-                type="button"
-                className="btn-sheet-clear"
-                onClick={() => setSearchFilter('')}
-              >
-                <X size={12} />
-              </button>
-            )}
+            </div>
+            <div className="stat-value-attr">
+              {currentMoveAttrs.length > 0 ? (
+                <div className="sheet-attr-badges-inline">
+                  {currentMoveAttrs.map((b) => (
+                    <span key={b.code} className={`attr-badge ${b.colorClass}`} title={b.label}>
+                      {b.code}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="no-attr">-</span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Spreadsheet Table: Full Width, Wraps Downward */}
-        <div
-          className="sheet-table-container"
-          onScroll={(e) => {
-            const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-            if (scrollHeight - scrollTop - clientHeight < 200 && visibleCount < filteredFollowups.length) {
-              setVisibleCount((prev) => Math.min(prev + 40, filteredFollowups.length));
-            }
-          }}
-        >
-          {filteredFollowups.length === 0 ? (
-            <div className="sheet-empty">
-              <span>Tidak ada gerakan yang cocok dengan filter atau rentang frame ini.</span>
-            </div>
-          ) : (
-            <table className="sheet-table">
-              <thead>
-                <tr>
-                  <th className="th-video" style={{ width: '40px' }}>Clip</th>
-                  <th className="th-fav" style={{ width: '36px' }}>Fav</th>
-                  <th style={{ width: '105px' }}>Input</th>
-                  <th>Nama Gerakan</th>
-                  <th style={{ width: '65px' }}>Target</th>
-                  <th style={{ width: '75px' }}>Startup</th>
-                  <th style={{ width: '135px' }}>Selisih vs Lawan</th>
-                  <th style={{ width: '75px' }}>On Block</th>
-                  <th style={{ width: '65px' }}>Dmg</th>
-                  <th style={{ width: '120px' }}>Properti</th>
-                  <th style={{ width: '50px', textAlign: 'center' }}>Lab</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedFollowups.map(({ move: m, diff, isCleanBeat, isTrade }) => {
-                  const isMid = m.is_mid || m.target?.toLowerCase().includes('m');
-                  const isLow = m.is_low || m.target?.toLowerCase().includes('l');
-                  const targetLabel = isMid ? 'Mid' : isLow ? 'Low' : 'High';
-                  const targetClass = isMid ? 'target-m' : isLow ? 'target-l' : 'target-h';
+        {/* Option Move Table Section */}
+        <div className="sheet-table-section">
+          {/* Option Move Title Row: Title (Left) and (i) Info Button (Right) */}
+          <div className="sheet-section-title-row">
+            <span className="sheet-section-title">OPTION MOVE ({sortedMoves.length})</span>
+            <button
+              type="button"
+              className="btn-option-guide-trigger"
+              onClick={() => setIsOptionGuideOpen(true)}
+              title="Penjelasan & Panduan Option Move"
+            >
+              <Info size={12} />
+            </button>
+          </div>
 
-                  const blockNum = m.block_num;
-                  const isPunishable = blockNum !== null && blockNum <= -10;
-                  const isPlus = blockNum !== null && blockNum > 0;
-
-                  return (
-                    <tr
-                      key={m.id}
-                      className="sheet-row"
-                      onClick={() => handleInspectMove(m)}
-                      title="Klik untuk membuka & menganalisis move ini"
-                    >
-                      <td className="td-video" onClick={(e) => e.stopPropagation()}>
-                        {m.video_url ? (
-                          <button
-                            type="button"
-                            className="btn-play-clip"
-                            onClick={() => setPreviewVideo(m)}
-                            title="Tonton Video Gerakan Ini"
-                          >
-                            <Play size={11} />
-                          </button>
-                        ) : (
-                          <span className="no-clip">-</span>
-                        )}
-                      </td>
-                      <td className="td-fav" onClick={(e) => e.stopPropagation()}>
-                        {onToggleFavorite && (
-                          <button
-                            type="button"
-                            className={`btn-fav-toggle ${favorites?.has(m.id) ? 'is-active' : ''}`}
-                            onClick={() => onToggleFavorite(m.id)}
-                            title={favorites?.has(m.id) ? 'Hapus dari Favorit' : 'Tandai sebagai Favorit'}
-                          >
-                            <Bookmark size={12} fill={favorites?.has(m.id) ? '#ffd700' : 'none'} />
-                          </button>
-                        )}
-                      </td>
-                      <td className="td-input">
-                        <span className="sheet-input-badge">{m.input}</span>
-                      </td>
-                      <td className="td-name">
-                        <span className="sheet-move-name">{m.name}</span>
-                      </td>
-                      <td className="td-target">
-                        <span className={`sheet-target-badge ${targetClass}`}>{targetLabel}</span>
-                      </td>
-                      <td className="td-startup">
-                        <strong className="text-cyan">
-                          {m.startup || (m.startup_num ? `i${m.startup_num}` : '-')}
-                        </strong>
-                      </td>
-                      <td className="td-diff">
-                        {isCleanBeat ? (
-                          <span className="diff-pill pill-faster">
-                            +{diff}F Lebih Cepat
-                          </span>
-                        ) : isTrade ? (
-                          <span className="diff-pill pill-trade">
-                            Trade 0F
-                          </span>
-                        ) : (
-                          <span className="diff-pill pill-slower">
-                            -{Math.abs(diff)}F Lebih Lambat
-                          </span>
-                        )}
-                      </td>
-                      <td className="td-block">
-                        <span className="frame-val-wrap">
-                          <span className={isPunishable ? 'text-crimson font-bold' : isPlus ? 'text-cyan font-bold' : 'text-secondary'}>
-                            {m.block || '-'}
-                          </span>
-                          {m.block_tooltip && (
-                            <span className="wiki-tooltip-icon" title={m.block_tooltip}>
-                              <Info size={10} />
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="td-damage">
-                        <span className="text-gold font-bold">{m.damage || '-'}</span>
-                      </td>
-                      <td className="td-props">
-                        <div className="props-wrap">
-                          {m.is_launcher && <span className="prop-badge prop-launch">Launcher</span>}
-                          {!isPunishable && isMid && <span className="prop-badge prop-safe">Safe Mid</span>}
-                          {isLow && <span className="prop-badge prop-low">Low</span>}
-                        </div>
-                      </td>
-                      <td className="td-link" style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="btn-table-inspect"
-                          title="Analisis move ini"
-                        >
-                          <ExternalLink size={13} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-          {filteredFollowups.length > visibleCount && (
-            <div style={{ textAlign: 'center', padding: '10px' }}>
+          {/* Dynamic Scenario Tabs: On Hit, Vs Crouch, Clean Hit, On CH, On Block */}
+          <div className="sheet-scenario-row">
+            {scenarioTabs.map((t) => (
               <button
+                key={t.id}
                 type="button"
-                className="btn-load-more"
-                onClick={() => setVisibleCount((prev) => prev + 40)}
+                className={`sheet-scenario-tab ${scenario === t.id ? 'tab-active' : ''} ${t.highlight ? 'tab-highlight' : ''}`}
+                onClick={() => {
+                  setScenario(t.id);
+                  setStanceFilter('all');
+                }}
               >
-                Muat lebih banyak ({filteredFollowups.length - visibleCount} opsi tersisa)...
+                <span>{t.label}</span>
               </button>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
 
-        {/* Footer info note */}
-        <div className="sheet-footer">
-          <span className="sheet-footer-text">
-            <strong>Tips:</strong> Klik baris gerakan mana saja di spreadsheet untuk langsung menganalisis opsi lanjutan berikutnya.
-          </span>
-          <span className="sheet-footer-count">
-            Total Opsi: <strong>{filteredFollowups.length}</strong> gerakan
-          </span>
-        </div>
-      </div>
-
-      {/* Video Preview Modal inside Follow-up Spreadsheet */}
-      {previewVideo && previewVideo.video_url && (
-        <div
-          className="modal-backdrop"
-          style={{ zIndex: 1200 }}
-          onClick={(e) => {
-            e.stopPropagation();
-            setPreviewVideo(null);
-          }}
-        >
-          <div className="video-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="v-modal-header">
-              <div className="v-modal-title" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                <span className="v-char">{characterName}:</span>
-                <span className="v-name">{previewVideo.name}</span>
-                <span className="v-input">({previewVideo.input})</span>
-                {previewVideo.is_string_video && (
-                  <span
-                    style={{
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      color: '#f59e0b',
-                      fontSize: '0.68rem',
-                      fontWeight: 800,
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                    }}
+          {/* Compact 1-Row Subfilter & Context Indicator */}
+          {(transitions.length > 0 || isForcedCrouch || isGrounded) && (
+            <div className="sheet-compact-context-row">
+              {transitions.length > 0 && !hasMandatoryStance && stanceMovesCount > 0 && (
+                <div className="sheet-stance-subfilter-group">
+                  <button
+                    type="button"
+                    className={`stance-subfilter-btn ${stanceFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setStanceFilter('all')}
                   >
-                    Klip Rangkaian: {previewVideo.video_string_parent} (Fokus s/d: {previewVideo.input})
+                    Semua ({validMoves.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`stance-subfilter-btn ${stanceFilter === 'normal' ? 'active' : ''}`}
+                    onClick={() => setStanceFilter('normal')}
+                  >
+                    Berdiri ({normalMovesCount})
+                  </button>
+                  <button
+                    type="button"
+                    className={`stance-subfilter-btn ${stanceFilter === 'stance' ? 'active' : ''}`}
+                    onClick={() => setStanceFilter('stance')}
+                  >
+                    {transitions[0].stance} {transitions[0].trigger ? `(${transitions[0].trigger})` : ''} ({stanceMovesCount})
+                  </button>
+                </div>
+              )}
+
+              {/* Minimalist Micro Badges for Status (Singkatan 1 kata) */}
+              <div className="sheet-micro-badges-group">
+                {isForcedCrouch && (
+                  <span className="micro-badge micro-badge-fc" title="Lawan dalam posisi jongkok (Force Crouch), respon tercepat ws+4 i11">
+                    FC (i11)
+                  </span>
+                )}
+                {isGrounded && (
+                  <span className="micro-badge micro-badge-grounded" title="Lawan jatuh di lantai (Grounded) - Serangan High otomatis dikecualikan">
+                    Grounded
                   </span>
                 )}
               </div>
-              <button
-                type="button"
-                className="btn-close-modal"
-                onClick={() => setPreviewVideo(null)}
-                title="Tutup Video"
-              >
-                <X size={18} />
-              </button>
             </div>
+          )}
 
-            <div className="v-player-container">
-              <video
-                src={previewVideo.video_url}
-                autoPlay
-                loop
-                controls
-                playsInline
-                className="modal-video-element"
-              />
-            </div>
-
-            <div className="v-modal-footer">
-              <div className="footer-stat">
-                <span className="f-lbl">Startup</span>
-                <span className="f-val text-cyan">{previewVideo.startup || 'N/A'}</span>
+          <div className="option-table-wrapper">
+            {sortedMoves.length === 0 ? (
+              <div className="option-empty-box">
+                {scenario === 'block' && (currentMove.block_num ?? 0) < 0 ? (
+                  <span>
+                    Gerakan ini minus di block ({currentMove.block || 'N/A'}). Anda berada dalam situasi disadvantage, tidak ada serangan yang mendahului jab lawan.
+                  </span>
+                ) : (
+                  <span>Tidak ada opsi gerakan yang mendahului serangan lawan pada skenario ini.</span>
+                )}
               </div>
-              <div className="footer-stat">
-                <span className="f-lbl">Block</span>
-                <span className={`f-val ${(previewVideo.block_num ?? 0) < 0 ? 'text-crimson' : 'text-cyan'}`}>
-                  {previewVideo.block || 'N/A'}
-                </span>
-              </div>
-              <div className="footer-stat">
-                <span className="f-lbl">Hit</span>
-                <span className="f-val">{previewVideo.hit || 'N/A'}</span>
-              </div>
-              <div className="footer-stat">
-                <span className="f-lbl">Damage</span>
-                <span className="f-val text-gold">{previewVideo.damage || 'N/A'}</span>
-              </div>
-            </div>
+            ) : (
+              <table className="option-moves-table">
+                <thead>
+                  <tr>
+                    <th
+                      className={`th-sortable ${sortConfig?.field === 'input' ? 'th-active-sort' : ''}`}
+                      style={{ width: '115px' }}
+                      onClick={() => handleSort('input')}
+                    >
+                      <div className="th-header-inner">
+                        <span>INPUT</span>
+                        {renderSortIndicator('input')}
+                      </div>
+                    </th>
+                    <th
+                      className={`th-sortable ${sortConfig?.field === 'name' ? 'th-active-sort' : ''}`}
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="th-header-inner">
+                        <span>NAMA GERAKAN</span>
+                        {renderSortIndicator('name')}
+                      </div>
+                    </th>
+                    <th
+                      className={`th-sortable ${sortConfig?.field === 'startup' ? 'th-active-sort' : ''}`}
+                      style={{ width: '85px', textAlign: 'right' }}
+                      onClick={() => handleSort('startup')}
+                    >
+                      <div className="th-header-inner" style={{ justifyContent: 'flex-end' }}>
+                        <span>STARTUP</span>
+                        {renderSortIndicator('startup')}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMoves.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="option-row"
+                      onClick={() => handleSelectNewMove(m)}
+                      title={`Buka detail dan opsi gerakan ${m.name} (${m.input})`}
+                    >
+                      <td className="td-input">
+                        <div className="input-cell-content">
+                          <span className="input-badge">{m.input}</span>
+                          {(() => {
+                            const p = getCandidateStancePrefix(m.input);
+                            if (p && accessibleStanceCodes.has(p)) {
+                              const tr = transitions.find((t) => t.stance === p);
+                              return (
+                                <span
+                                  className="row-stance-chip"
+                                  title={`Jurus dari stance ${p}${tr?.trigger ? ` (input: ${tr.trigger})` : ''}`}
+                                >
+                                  {p}{tr?.trigger ? ` (${tr.trigger})` : ''}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      </td>
+                      <td className="td-name">
+                        <div className="name-cell">
+                          <span className="name-text">{m.name}</span>
+                          {m.video_url && <Play size={10} className="row-play-hint" />}
+                        </div>
+                      </td>
+                      <td className="td-startup" style={{ textAlign: 'right' }}>
+                        <span className="text-cyan font-bold">{formatStartup(m.startup, m.startup_num)}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Attribute Definitions & Guide Modal */}
+      {isAttrGuideOpen && (
+        <AttributeGuideModal
+          isOpen={isAttrGuideOpen}
+          onClose={() => setIsAttrGuideOpen(false)}
+        />
+      )}
+
+      {/* Option Move Guide Modal */}
+      {isOptionGuideOpen && (
+        <OptionGuideModal
+          isOpen={isOptionGuideOpen}
+          onClose={() => setIsOptionGuideOpen(false)}
+        />
       )}
     </div>,
     document.body

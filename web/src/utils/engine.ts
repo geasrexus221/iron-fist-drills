@@ -6,6 +6,7 @@ import type {
   FrameTrapEvaluation,
   InputFormat,
   MinusBracket,
+  StringFilter,
   ThrowBreakButton,
   ThrowBreakEvaluation,
   ThrowHandVisual,
@@ -21,6 +22,34 @@ export function shuffleArray<T>(array: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+/**
+ * Counts the number of attack hits in a Tekken move input string.
+ * Accurately skips pure directional inputs like 'f', 'd/f', 'qcf', etc.
+ */
+export function countMoveHits(input: string): number {
+  if (!input) return 1;
+  const rawParts = input.split(',').map((s) => s.trim()).filter(Boolean);
+  const hits: string[] = [];
+  let buffer = '';
+
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i];
+    const isPureDirection = /^(f|b|d|u|df|db|uf|ub|qcf|qcb|ws|fc|ss|wr)$/i.test(part);
+    if (isPureDirection && i < rawParts.length - 1) {
+      buffer = buffer ? `${buffer},${part}` : part;
+    } else {
+      if (buffer) {
+        hits.push(`${buffer},${part}`);
+        buffer = '';
+      } else {
+        hits.push(part);
+      }
+    }
+  }
+  if (buffer) hits.push(buffer);
+  return Math.max(1, hits.length);
 }
 
 /**
@@ -421,19 +450,13 @@ export function getThrowCountForCharacter(charName: CharacterName): number {
 }
 
 /**
- * Generates a question for Throw Break Drill Mode.
- * Supports both:
- * - 'direct': Standalone single-step reaction (includes intermediate chain branches)
- * - 'multistage': Sequential chain grab simulation (GUARANTEED to start from True Starter Stage 1)
+ * Returns the pool of breakable throws for a character.
  */
-export function generateThrowBreakQuestion(
+export function getThrowBreakMovePool(
   oppChar: CharacterName,
-  isBlindMode: boolean = true,
   throwDrillType: ThrowDrillType = 'direct'
-): QuizQuestion {
+): Move[] {
   const allMoves = CHARACTER_DATA[oppChar] || CHARACTER_DATA['King'];
-  
-  // Filter for breakable throws only
   const breakableThrows = allMoves.filter((m) => {
     if (!isThrowMove(m)) return false;
     const parsed = parseThrowBreak(m);
@@ -448,6 +471,32 @@ export function generateThrowBreakQuestion(
         return !parsed.isUnbreakable && parsed.validBreaks.length > 0;
       });
 
+  if (throwDrillType === 'multistage') {
+    const chainStarters = basePool.filter((m) => {
+      const inp = (m.input || '').trim();
+      return TRUE_CHAIN_STARTERS.includes(inp) && findChainFollowups(m, allMoves).length > 0;
+    });
+    return chainStarters.length > 0 ? chainStarters : basePool;
+  }
+  return basePool;
+}
+
+/**
+ * Generates a question for Throw Break Drill Mode.
+ * Supports both:
+ * - 'direct': Standalone single-step reaction (includes intermediate chain branches)
+ * - 'multistage': Sequential chain grab simulation (GUARANTEED to start from True Starter Stage 1)
+ */
+export function generateThrowBreakQuestion(
+  oppChar: CharacterName,
+  isBlindMode: boolean = true,
+  throwDrillType: ThrowDrillType = 'direct',
+  presetMove?: Move,
+  modifiers?: Partial<QuizQuestion>
+): QuizQuestion {
+  const allMoves = CHARACTER_DATA[oppChar] || CHARACTER_DATA['King'];
+  const basePool = getThrowBreakMovePool(oppChar, throwDrillType);
+
   const withVideo = basePool.filter((m) => m.video_url);
   const selectedPool = withVideo.length >= 2 ? withVideo : basePool;
 
@@ -456,7 +505,13 @@ export function generateThrowBreakQuestion(
   let chainStage = 1;
   let chainParentName: string | undefined;
 
-  if (throwDrillType === 'multistage') {
+  if (presetMove) {
+    throwMove = presetMove;
+    const meta = getChainMetadata(throwMove);
+    chainStage = meta.chainStage;
+    chainParentName = meta.chainParentName;
+    chainFollowups = findChainFollowups(throwMove, allMoves);
+  } else if (throwDrillType === 'multistage') {
     // In multi-stage mode, ALWAYS filter for True Chain Starters (Tahap 1)
     const chainStarters = selectedPool.filter((m) => {
       const inp = (m.input || '').trim();
@@ -464,12 +519,10 @@ export function generateThrowBreakQuestion(
     });
 
     if (chainStarters.length > 0) {
-      // Pick strictly from true starters
       throwMove = chainStarters[Math.floor(Math.random() * chainStarters.length)];
       chainFollowups = findChainFollowups(throwMove, allMoves);
       chainStage = 1;
     } else {
-      // For characters without chain throws (e.g. Raven, Jin), pick standard throw
       const nonMidChain = selectedPool.filter((m) => !getChainMetadata(m).isChainStep);
       const poolToUse = nonMidChain.length > 0 ? nonMidChain : selectedPool;
       throwMove = poolToUse[Math.floor(Math.random() * poolToUse.length)];
@@ -501,7 +554,9 @@ export function generateThrowBreakQuestion(
     chainStage,
     chainParentName,
     chainFollowups,
+    maxBlitzTime: 4.0 + Math.max(0, chainStage - 1) * 1.0,
     correctMoves: [],
+    ...modifiers,
   };
 }
 
@@ -651,25 +706,21 @@ export function evaluateFrameTrap(
 }
 
 /**
- * Generates a question for Punishment Quiz Mode
+ * Returns the pool of moves for punishment training based on opponent and minus brackets.
  */
-export function generatePunishmentQuestion(
-  userChar: CharacterName,
+export function getPunishmentMovePool(
   oppChar: CharacterName,
-  format: InputFormat,
   minusFilter: MinusBracket[] = ['all-moves'],
-  isBlindMode: boolean = true
-): QuizQuestion {
-  const allOpponentMoves = CHARACTER_DATA[oppChar].filter(
+  stringFilter: StringFilter = 'all'
+): Move[] {
+  const allOpponentMoves = (CHARACTER_DATA[oppChar] || []).filter(
     (m) => m.block_num !== null && !isThrowMove(m)
   );
 
+  const isAllMoves = minusFilter.length === 0 || minusFilter.includes('all-moves');
   let oppMoves: Move[] = [];
 
-  const isAllMoves = minusFilter.length === 0 || minusFilter.includes('all-moves');
-
   if (isAllMoves) {
-    // All opponent moves: tests plus on block, safe moves (-1 to -9), and minus moves (<= -10)
     oppMoves = allOpponentMoves;
   } else {
     oppMoves = allOpponentMoves.filter((m) => {
@@ -685,19 +736,51 @@ export function generatePunishmentQuestion(
     });
   }
 
-  if (oppMoves.length === 0) {
-    oppMoves = allOpponentMoves;
+  if (stringFilter && stringFilter !== 'all') {
+    const byString = oppMoves.filter((m) => {
+      const hits = countMoveHits(m.input);
+      if (stringFilter === '1-hit') return hits === 1;
+      if (stringFilter === '2-hits') return hits === 2;
+      if (stringFilter === '3-hits') return hits === 3;
+      if (stringFilter === '3+hits') return hits >= 3;
+      return true;
+    });
+    if (byString.length > 0) {
+      oppMoves = byString;
+    }
   }
+
+  return oppMoves.length > 0 ? oppMoves : allOpponentMoves;
+}
+
+/**
+ * Generates a question for Punishment Quiz Mode
+ */
+export function generatePunishmentQuestion(
+  userChar: CharacterName,
+  oppChar: CharacterName,
+  format: InputFormat,
+  minusFilter: MinusBracket[] = ['all-moves'],
+  isBlindMode: boolean = true,
+  presetMove?: Move,
+  modifiers?: Partial<QuizQuestion>,
+  stringFilter: StringFilter = 'all'
+): QuizQuestion {
+  const oppMoves = getPunishmentMovePool(oppChar, minusFilter, stringFilter);
 
   // Prioritize moves with video if available
   const movesWithVideo = oppMoves.filter((m) => m.video_url);
   const pool = movesWithVideo.length > 3 ? movesWithVideo : oppMoves;
-  const oppMove = pool[Math.floor(Math.random() * pool.length)];
+  const oppMove = presetMove || pool[Math.floor(Math.random() * pool.length)];
   const isOpponentSafe = (oppMove.block_num ?? 0) >= -9;
   const minus = Math.abs(oppMove.block_num ?? 10);
 
+  // Calculate dynamic Blitz timer: 4.0s base + 0.5s per extra hit
+  const hits = countMoveHits(oppMove.input);
+  const maxBlitzTime = 4.0 + Math.max(0, hits - 1) * 0.5;
+
   // User's moves (exclude throws)
-  const userMoves = CHARACTER_DATA[userChar].filter((m) => m.startup_num !== null && !isThrowMove(m));
+  const userMoves = (CHARACTER_DATA[userChar] || []).filter((m) => m.startup_num !== null && !isThrowMove(m));
   const guaranteedMoves = isOpponentSafe 
     ? [] 
     : userMoves.filter((m) => (m.startup_num ?? 99) <= minus);
@@ -756,13 +839,16 @@ export function generatePunishmentQuestion(
     isOpponentSafe,
     isBlindMode,
     minusFilter,
+    stringFilter,
+    maxBlitzTime,
     choices,
     correctMoves: guaranteedMoves,
     optimalMove,
+    ...modifiers,
   };
 }
 
-function isKnockdownOrAirborne(strVal?: string | null): boolean {
+export function isKnockdownOrAirborne(strVal?: string | null): boolean {
   if (!strVal) return false;
   const s = strVal.toLowerCase();
   return (
@@ -775,19 +861,18 @@ function isKnockdownOrAirborne(strVal?: string | null): boolean {
   );
 }
 
-/**
- * Generates a question for Frame Advantage / Frame Trap Mode
- */
-export function generateFrameTrapQuestion(
-  userChar: CharacterName,
-  oppChar: CharacterName,
-  format: InputFormat,
-  isBlindMode: boolean = true
-): QuizQuestion {
-  const userMoves = CHARACTER_DATA[userChar].filter((m) => !isThrowMove(m));
+export interface FrameTrapCandidate {
+  leadMove: Move;
+  condition: 'hit' | 'block';
+  advantage: number;
+}
 
-  // Clean candidate pools:
-  // 1. Standing ON HIT candidates (+2 to +9 on hit, non-knockdown)
+/**
+ * Returns candidate frame trap moves (plus on block or on hit) for a character.
+ */
+export function getFrameTrapMovePool(userChar: CharacterName): FrameTrapCandidate[] {
+  const userMoves = (CHARACTER_DATA[userChar] || []).filter((m) => !isThrowMove(m));
+
   const onHitCandidates = userMoves.filter(
     (m) =>
       m.hit_num !== null &&
@@ -796,7 +881,6 @@ export function generateFrameTrapQuestion(
       !isKnockdownOrAirborne(m.hit)
   );
 
-  // 2. Pure PLUS ON BLOCK candidates (+1 to +8 on block, non-knockdown)
   const onBlockCandidates = userMoves.filter(
     (m) =>
       m.block_num !== null &&
@@ -805,26 +889,48 @@ export function generateFrameTrapQuestion(
       !isKnockdownOrAirborne(m.block)
   );
 
-  // Randomly decide condition: 'hit' or 'block' (50/50 probability)
-  let condition: 'hit' | 'block' = 'hit';
-  if (onBlockCandidates.length > 0 && Math.random() < 0.5) {
-    condition = 'block';
-  }
+  const list: FrameTrapCandidate[] = [];
+  onBlockCandidates.forEach((m) => list.push({ leadMove: m, condition: 'block', advantage: m.block_num ?? 1 }));
+  onHitCandidates.forEach((m) => list.push({ leadMove: m, condition: 'hit', advantage: m.hit_num ?? 4 }));
+  return list;
+}
+
+/**
+ * Generates a question for Frame Advantage / Frame Trap Mode
+ */
+export function generateFrameTrapQuestion(
+  userChar: CharacterName,
+  oppChar: CharacterName,
+  format: InputFormat,
+  isBlindMode: boolean = true,
+  presetCandidate?: FrameTrapCandidate,
+  modifiers?: Partial<QuizQuestion>
+): QuizQuestion {
+  const userMoves = (CHARACTER_DATA[userChar] || []).filter((m) => !isThrowMove(m));
 
   let leadMove: Move;
+  let condition: 'hit' | 'block';
   let advantage: number;
 
-  if (condition === 'block' && onBlockCandidates.length > 0) {
-    const withVid = onBlockCandidates.filter((m) => m.video_url);
-    const pool = withVid.length >= 2 ? withVid : onBlockCandidates;
-    leadMove = pool[Math.floor(Math.random() * pool.length)];
-    advantage = leadMove.block_num ?? 1;
+  if (presetCandidate) {
+    leadMove = presetCandidate.leadMove;
+    condition = presetCandidate.condition;
+    advantage = presetCandidate.advantage;
   } else {
-    condition = 'hit';
-    const withVid = onHitCandidates.filter((m) => m.video_url);
-    const pool = withVid.length >= 5 ? withVid : onHitCandidates;
-    leadMove = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : userMoves[0];
-    advantage = leadMove.hit_num ?? 4;
+    const candidates = getFrameTrapMovePool(userChar);
+    if (candidates.length > 0) {
+      // Prioritize moves with video if available
+      const withVid = candidates.filter((c) => c.leadMove.video_url);
+      const pool = withVid.length >= 3 ? withVid : candidates;
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      leadMove = picked.leadMove;
+      condition = picked.condition;
+      advantage = picked.advantage;
+    } else {
+      leadMove = userMoves[0];
+      condition = 'hit';
+      advantage = leadMove.hit_num ?? 4;
+    }
   }
 
   // Valid follow-up moves: startup - advantage < 10 (beats i10 jab)
@@ -873,6 +979,9 @@ export function generateFrameTrapQuestion(
     choices = shuffleArray(selected);
   }
 
+  const hits = countMoveHits(leadMove.input);
+  const maxBlitzTime = 4.0 + Math.max(0, hits - 1) * 0.5;
+
   return {
     id: `frametrap_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     mode: 'frame-trap',
@@ -882,8 +991,10 @@ export function generateFrameTrapQuestion(
     condition,
     advantageFrames: advantage,
     isBlindMode,
+    maxBlitzTime,
     choices,
     correctMoves: validFollowUps,
     optimalMove: optimalFollowUp,
+    ...modifiers,
   };
 }

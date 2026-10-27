@@ -1,28 +1,33 @@
 import React, { useState } from 'react';
-import type { CharacterName, InputFormat } from '../types/tekken';
+import type { CharacterName, InputFormat, SessionScope, DrillModifiers } from '../types/tekken';
 import { CHARACTERS } from '../data';
 import { CharacterPickerModal } from './CharacterPickerModal';
-import { Zap, ArrowLeft, Swords, Sparkles, RotateCcw } from 'lucide-react';
+import { Zap, ArrowLeft, RotateCcw, Info, X } from 'lucide-react';
 
 interface FrameTrapSetupProps {
-  onStart: (userChar: CharacterName, format: InputFormat, isBlindMode: boolean) => void;
+  onStart: (userChar: CharacterName, format: InputFormat, modifiers: DrillModifiers) => void;
   onBack: () => void;
   initialUserChar?: CharacterName;
   initialFormat?: InputFormat;
-  initialBlindMode?: boolean;
+  initialModifiers?: Partial<DrillModifiers>;
 }
 
 export const FrameTrapSetup: React.FC<FrameTrapSetupProps> = ({
   onStart,
   onBack,
   initialUserChar = 'Jin',
-  initialFormat = 'full-movelist',
-  initialBlindMode = true,
+  initialFormat = 'four-choices',
+  initialModifiers,
 }) => {
   const [userChar, setUserChar] = useState<CharacterName>(initialUserChar);
   const [format, setFormat] = useState<InputFormat>(initialFormat);
-  const [isBlindMode, setIsBlindMode] = useState<boolean>(initialBlindMode);
+  const [sessionScope, setSessionScope] = useState<SessionScope>(initialModifiers?.sessionScope || 'endless');
+  const [isSinglePlay, setIsSinglePlay] = useState<boolean>(initialModifiers?.isSinglePlay || false);
+  const [isBlitzMode, setIsBlitzMode] = useState<boolean>(initialModifiers?.isBlitzMode || false);
+  const [isSurvivalMode, setIsSurvivalMode] = useState<boolean>(initialModifiers?.isSurvivalMode || false);
+  const [isBlindMode, setIsBlindMode] = useState<boolean>(initialModifiers?.isBlindMode ?? true);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState<'session-scope' | 'modifiers' | 'format' | null>(null);
 
   const charData = CHARACTERS.find((c) => c.name === userChar);
 
@@ -77,56 +82,215 @@ export const FrameTrapSetup: React.FC<FrameTrapSetupProps> = ({
         onSelectCharacter={(char) => setUserChar(char)}
       />
 
-      {/* Blind Mode Setting */}
+      {/* Session Scope (Endless Mode vs Gauntlet Mode) */}
       <div className="setup-card">
-        <div className="toggle-row">
-          <div className="toggle-info">
-            <span className="setup-section-title">BLIND MODE (TUTUP ANGKA ADVANTAGE)</span>
-          </div>
+        <div className="section-header-row">
+          <span className="setup-section-title">TIPE SESI LATIHAN</span>
           <button
             type="button"
-            className={`switch-toggle-btn ${isBlindMode ? 'switch-on' : 'switch-off'}`}
+            className="btn-info-circle"
+            onClick={() => setInfoModal('session-scope')}
+            title="Penjelasan Tipe Sesi Latihan"
+          >
+            <Info size={14} />
+          </button>
+        </div>
+        <div className="session-scope-row">
+          <button
+            type="button"
+            className={`scope-chip ${sessionScope === 'endless' ? 'active-scope' : ''}`}
+            onClick={() => setSessionScope('endless')}
+          >
+            {sessionScope === 'endless' ? '✓ ' : ''}Endless Mode
+          </button>
+
+          <button
+            type="button"
+            className={`scope-chip ${sessionScope === 'gauntlet' ? 'active-scope active-scope-gold' : ''}`}
+            onClick={() => setSessionScope('gauntlet')}
+          >
+            {sessionScope === 'gauntlet' ? '✓ ' : ''}Gauntlet Mode
+          </button>
+        </div>
+      </div>
+
+      {/* Challenge Modifiers */}
+      <div className="setup-card">
+        <div className="section-header-row">
+          <span className="setup-section-title">TANTANGAN &amp; MODIFIER</span>
+          <button
+            type="button"
+            className="btn-info-circle"
+            onClick={() => setInfoModal('modifiers')}
+            title="Penjelasan Tantangan & Modifier"
+          >
+            <Info size={14} />
+          </button>
+        </div>
+        <div className="modifier-grid">
+          <button
+            type="button"
+            className={`modifier-chip ${isBlindMode ? 'active-modifier active-modifier-purple' : ''}`}
             onClick={() => setIsBlindMode(!isBlindMode)}
           >
-            <span className="switch-knob" />
-            <span className="switch-text">{isBlindMode ? 'AKTIF' : 'NONAKTIF'}</span>
+            {isBlindMode ? '✓ ' : ''}Blind
+          </button>
+
+          <button
+            type="button"
+            className={`modifier-chip ${isSinglePlay ? 'active-modifier' : ''}`}
+            onClick={() => setIsSinglePlay(!isSinglePlay)}
+          >
+            {isSinglePlay ? '✓ ' : ''}Once
+          </button>
+
+          <button
+            type="button"
+            className={`modifier-chip ${isBlitzMode ? 'active-modifier' : ''}`}
+            onClick={() => setIsBlitzMode(!isBlitzMode)}
+          >
+            {isBlitzMode ? '✓ ' : ''}Blitz
+          </button>
+
+          <button
+            type="button"
+            className={`modifier-chip ${isSurvivalMode ? 'active-modifier active-modifier-crimson' : ''}`}
+            onClick={() => setIsSurvivalMode(!isSurvivalMode)}
+          >
+            {isSurvivalMode ? '✓ ' : ''}Survival
           </button>
         </div>
       </div>
 
       {/* Input Format Option */}
       <div className="setup-card">
-        <span className="setup-section-title">FORMAT PILIHAN INPUT</span>
+        <div className="section-header-row">
+          <span className="setup-section-title">FORMAT PILIHAN INPUT</span>
+          <button
+            type="button"
+            className="btn-info-circle"
+            onClick={() => setInfoModal('format')}
+            title="Penjelasan Format Pilihan Input"
+          >
+            <Info size={14} />
+          </button>
+        </div>
         <div className="format-options-row">
           <button
             type="button"
-            className={`format-card ${format === 'full-movelist' ? 'active-format active-format-gold' : ''}`}
-            onClick={() => setFormat('full-movelist')}
+            className={`format-chip ${format === 'four-choices' ? 'active-format' : ''}`}
+            onClick={() => setFormat('four-choices')}
           >
-            <Swords size={18} className="text-gold" />
-            <div className="f-text">
-              <span className="f-title">Full Movelist Selector</span>
-            </div>
+            {format === 'four-choices' ? '✓ ' : ''}Tombol Generik
           </button>
 
           <button
             type="button"
-            className={`format-card ${format === 'four-choices' ? 'active-format' : ''}`}
-            onClick={() => setFormat('four-choices')}
+            className={`format-chip ${format === 'full-movelist' ? 'active-format active-format-gold' : ''}`}
+            onClick={() => setFormat('full-movelist')}
           >
-            <Sparkles size={18} className="text-cyan" />
-            <div className="f-text">
-              <span className="f-title">Tombol Frame Generik (i10 - i15+)</span>
-            </div>
+            {format === 'full-movelist' ? '✓ ' : ''}Custom Move
           </button>
         </div>
       </div>
+
+      {/* Info Popup Modal */}
+      {infoModal && (
+        <div className="info-modal-overlay animate-fade-in" onClick={() => setInfoModal(null)}>
+          <div className="info-modal-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="info-modal-header">
+              <div className="info-modal-title-wrap">
+                <Info size={16} className="text-cyan" />
+                <h3 className="info-modal-title">
+                  {infoModal === 'session-scope' && 'Tipe Sesi Latihan'}
+                  {infoModal === 'modifiers' && 'Tantangan & Modifier'}
+                  {infoModal === 'format' && 'Format Pilihan Input'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="btn-info-modal-close"
+                onClick={() => setInfoModal(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="info-modal-content">
+              {infoModal === 'session-scope' && (
+                <div className="info-desc-list">
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-cyan">Endless Mode</span>
+                    <span className="info-item-text">Latihan tanpa henti. Situasi frame trap diacak terus-menerus tanpa batas untuk membangun insting berkelanjutan.</span>
+                  </div>
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-gold">Gauntlet Mode</span>
+                    <span className="info-item-text">Setiap setup frame trap diuji tepat 1 kali tanpa pengulangan hingga selesai, dilengkapi evaluasi statistik.</span>
+                  </div>
+                </div>
+              )}
+
+              {infoModal === 'modifiers' && (
+                <div className="info-desc-list">
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-cyan">Once</span>
+                    <span className="info-item-text">Video gerakan hanya diputar 1 kali lalu membeku (freeze) sampai Anda menjawab.</span>
+                  </div>
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-gold">Blitz</span>
+                    <span className="info-item-text">Batas waktu memilih jawaban 3 detik. Waktu habis dihitung sebagai respon salah.</span>
+                  </div>
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-crimson">Survival</span>
+                    <span className="info-item-text">Diberikan 3 HP (nyawa). Respon salah atau waktu habis akan mengurangi 1 HP. Sesi Game Over jika HP habis.</span>
+                  </div>
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-purple">Blind</span>
+                    <span className="info-item-text">Sembunyikan angka frame advantage sebelum jawaban dipilih untuk menguji insting membaca situasi.</span>
+                  </div>
+                </div>
+              )}
+
+              {infoModal === 'format' && (
+                <div className="info-desc-list">
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-gold">Custom Move</span>
+                    <span className="info-item-text">Menebak nama gerakan spesifik karakter Anda beserta notasi inputnya untuk mengeksekusi trap.</span>
+                  </div>
+                  <div className="info-desc-item">
+                    <span className="info-item-label text-cyan">Tombol Generik</span>
+                    <span className="info-item-text">Pilihan cepat tombol aksi standar berdasarkan startup frame tanpa menghafal nama gerakan spesifik.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="info-modal-footer">
+              <button
+                type="button"
+                className="btn-info-modal-dismiss"
+                onClick={() => setInfoModal(null)}
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Start Button */}
       <div className="setup-action-row">
         <button
           className="btn-start-drill"
-          onClick={() => onStart(userChar, format, isBlindMode)}
+          onClick={() =>
+            onStart(userChar, format, {
+              sessionScope,
+              isSinglePlay,
+              isBlitzMode,
+              isSurvivalMode,
+              isBlindMode,
+            })
+          }
         >
           <span>MULAI LATIHAN FRAME TRAP ({userChar})</span>
           <Zap size={20} />
@@ -268,86 +432,103 @@ export const FrameTrapSetup: React.FC<FrameTrapSetupProps> = ({
           gap: 10px;
         }
         .setup-section-title {
-          font-size: 0.85rem;
+          font-size: 0.75rem;
           font-weight: 800;
-          letter-spacing: 0.05em;
-          color: #fff;
-        }
-        .toggle-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-        }
-        .toggle-info {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-        .switch-toggle-btn {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 6px 14px;
-          border-radius: var(--radius-full);
-          font-size: 0.8rem;
-          font-weight: 800;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .switch-on {
-          background: rgba(0, 229, 255, 0.15);
-          border: 1px solid var(--electric-cyan);
-          color: var(--electric-cyan);
-        }
-        .switch-off {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          letter-spacing: 0.08em;
           color: var(--text-muted);
         }
-        .switch-knob {
-          width: 10px;
-          height: 10px;
+        .section-header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+        }
+        .btn-info-circle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
-          background: currentColor;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: all 0.15s ease;
+          flex-shrink: 0;
+        }
+        .btn-info-circle:hover {
+          color: var(--electric-cyan);
+          border-color: var(--electric-cyan);
+          background: rgba(0, 229, 255, 0.12);
+        }
+        .session-scope-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+        .modifier-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
         }
         .format-options-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 10px;
         }
-        .format-card {
+        .scope-chip,
+        .modifier-chip,
+        .format-chip {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 12px 14px;
+          justify-content: center;
+          padding: 10px 14px;
           background: #0d0f18;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border: 1.5px solid rgba(255, 255, 255, 0.08);
           border-radius: var(--radius-sm);
-          text-align: left;
+          color: var(--text-secondary);
+          font-size: 0.82rem;
+          font-weight: 800;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.15s ease-in-out;
+          text-align: center;
+          user-select: none;
+          min-height: 40px;
         }
-        .format-card:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-        .format-card.active-format {
-          border-color: var(--electric-cyan);
-          background: rgba(0, 229, 255, 0.08);
-        }
-        .format-card.active-format-gold {
-          border-color: var(--heihachi-gold);
-          background: rgba(255, 183, 3, 0.08);
-        }
-        .f-text {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .f-title {
-          font-weight: 700;
-          font-size: 0.88rem;
+        .scope-chip:hover,
+        .modifier-chip:hover,
+        .format-chip:hover {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.22);
           color: #fff;
+        }
+        .active-scope,
+        .active-modifier,
+        .active-format {
+          background: rgba(0, 229, 255, 0.14) !important;
+          border-color: var(--electric-cyan) !important;
+          color: var(--electric-cyan) !important;
+          box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
+        }
+        .active-scope-gold,
+        .active-format-gold {
+          background: rgba(255, 183, 3, 0.14) !important;
+          border-color: var(--heihachi-gold) !important;
+          color: var(--heihachi-gold) !important;
+          box-shadow: 0 0 14px rgba(255, 183, 3, 0.25);
+        }
+        .active-modifier-crimson {
+          background: rgba(255, 30, 86, 0.14) !important;
+          border-color: var(--devil-crimson) !important;
+          color: var(--devil-crimson) !important;
+          box-shadow: 0 0 14px rgba(255, 30, 86, 0.25);
+        }
+        .active-modifier-purple {
+          background: rgba(179, 136, 255, 0.14) !important;
+          border-color: #b388ff !important;
+          color: #b388ff !important;
+          box-shadow: 0 0 14px rgba(179, 136, 255, 0.25);
         }
         .setup-action-row {
           display: flex;
@@ -374,6 +555,118 @@ export const FrameTrapSetup: React.FC<FrameTrapSetupProps> = ({
           opacity: 0.95;
         }
 
+        /* Info Modal Styles */
+        .info-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(6px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          padding: 16px;
+        }
+        .info-modal-card {
+          background: #111422;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: var(--radius-md);
+          max-width: 440px;
+          width: 100%;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.75);
+        }
+        .info-modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          padding-bottom: 10px;
+        }
+        .info-modal-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .info-modal-title {
+          margin: 0;
+          font-size: 0.98rem;
+          font-weight: 800;
+          color: #fff;
+          letter-spacing: 0.03em;
+        }
+        .btn-info-modal-close {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.15s;
+        }
+        .btn-info-modal-close:hover {
+          color: #fff;
+        }
+        .info-desc-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .info-desc-item {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          background: rgba(255, 255, 255, 0.03);
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .info-item-label {
+          font-size: 0.8rem;
+          font-weight: 800;
+        }
+        .info-item-text {
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+          line-height: 1.35;
+        }
+        .btn-info-modal-dismiss {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          color: #fff;
+          font-size: 0.8rem;
+          font-weight: 800;
+          padding: 8px 16px;
+          border-radius: var(--radius-sm);
+          cursor: pointer;
+          align-self: flex-end;
+          transition: all 0.15s;
+        }
+        .btn-info-modal-dismiss:hover {
+          background: rgba(255, 255, 255, 0.15);
+        }
+        .text-purple {
+          color: #b388ff;
+        }
+        .text-cyan {
+          color: var(--electric-cyan);
+        }
+        .text-crimson {
+          color: var(--devil-crimson);
+        }
+        .text-gold {
+          color: var(--heihachi-gold);
+        }
+
         @media (max-width: 768px) {
           .setup-container {
             gap: 10px;
@@ -397,14 +690,40 @@ export const FrameTrapSetup: React.FC<FrameTrapSetupProps> = ({
             grid-template-columns: 1fr 1fr;
             gap: 8px;
           }
-          .format-card {
-            padding: 10px;
+          .session-scope-row {
+            grid-template-columns: 1fr 1fr;
             gap: 8px;
+          }
+          .modifier-grid {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
           }
           .btn-start-drill {
             padding: 12px;
             font-size: 0.95rem;
           }
+        }
+
+        /* Android Font & Compact Scaling */
+        .is-android .setup-title {
+          font-size: 1.05rem !important;
+        }
+        .is-android .setup-section-title {
+          font-size: 0.68rem !important;
+        }
+        .is-android .char-hero-name {
+          font-size: 1.02rem !important;
+        }
+        .is-android .scope-chip,
+        .is-android .modifier-chip,
+        .is-android .format-chip {
+          font-size: 0.72rem !important;
+          padding: 7px 8px !important;
+          min-height: 34px !important;
+        }
+        .is-android .btn-start-drill {
+          font-size: 0.88rem !important;
+          padding: 10px 14px !important;
         }
       `}</style>
     </div>

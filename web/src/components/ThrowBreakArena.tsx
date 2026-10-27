@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import type { QuizQuestion, CharacterName, ThrowBreakButton, ThrowBreakEvaluation, Move } from '../types/tekken';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import type { QuizQuestion, CharacterName, ThrowBreakButton, ThrowBreakEvaluation, Move, QuizScore } from '../types/tekken';
 import { CHARACTER_DATA } from '../data';
 import { evaluateThrowBreak, parseThrowBreak, findChainFollowups } from '../utils/engine';
 import { useDeviceType, triggerHaptic } from '../hooks/useDeviceType';
@@ -13,6 +13,10 @@ import {
   ArrowLeft,
   Settings,
   Hand,
+  Trophy,
+  Timer,
+  EyeOff,
+  RotateCcw,
 } from 'lucide-react';
 
 interface ChainStepHistory {
@@ -33,8 +37,10 @@ interface ThrowBreakArenaProps {
   onNextQuestion: () => void;
   onAnswerRecorded: (isCorrect: boolean, isOptimal: boolean) => void;
   oppChar: CharacterName;
+  score?: QuizScore;
   onBackToMenu: () => void;
   onBackToSetup: () => void;
+  onRetrySession?: () => void;
 }
 
 export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
@@ -42,8 +48,10 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
   onNextQuestion,
   onAnswerRecorded,
   oppChar,
+  score,
   onBackToMenu,
   onBackToSetup,
+  onRetrySession,
 }) => {
   const { isMobile } = useDeviceType();
   const [selectedButton, setSelectedButton] = useState<ThrowBreakButton | null>(null);
@@ -52,12 +60,25 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   const [showResultFlash, setShowResultFlash] = useState(false);
 
+  // Modifiers state
+  const [survivalHp, setSurvivalHp] = useState<number>(3);
+  const [summaryModal, setSummaryModal] = useState<{
+    isOpen: boolean;
+    status: 'completed' | 'game-over';
+    title: string;
+    subtitle: string;
+  } | null>(null);
+
   // Active move & chain stage states (supports multi-stage sequential transitions)
   const [activeMove, setActiveMove] = useState(question.throwMove);
   const [activeChainStage, setActiveChainStage] = useState(question.chainStage || 1);
   const [activeFollowups, setActiveFollowups] = useState(question.chainFollowups || []);
   const [activeValidBreaks, setActiveValidBreaks] = useState(question.validBreaks || ['1', '2']);
   const [activeRawBreakText, setActiveRawBreakText] = useState(question.rawBreakText || '');
+
+  const maxBlitzTime = 4.0 + Math.max(0, (activeChainStage || 1) - 1) * 1.0;
+  const [timeLeft, setTimeLeft] = useState<number>(maxBlitzTime);
+  const [isVideoPlaying, setIsVideoPlaying] = useState<boolean>(false);
 
   // Continuation & Verdict State
   const [pendingContinuation, setPendingContinuation] = useState<PendingContinuation | null>(null);
@@ -89,6 +110,10 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
     setPendingContinuation(null);
     setVerdictText(null);
 
+    const initialMaxTime = 4.0 + Math.max(0, initialStage - 1) * 1.0;
+    setTimeLeft(initialMaxTime);
+    setIsVideoPlaying(!question.throwMove?.video_url);
+
     setChainHistory([
       {
         stage: initialStage,
@@ -104,10 +129,71 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
     }
   }, [question.id, question.throwMove]);
 
-  const handleSelectButton = (button: ThrowBreakButton) => {
+  // Blitz mode timeout handler
+  const handleTimeout = useCallback(() => {
+    if (isAnswered) return;
+    setIsAnswered(true);
+    setSelectedButton(null);
+    setPendingContinuation(null);
+    setVerdictText({
+      status: 'failed',
+      text: `WAKTU HABIS! (${maxBlitzTime.toFixed(1)} Detik)`,
+    });
+    setChainHistory((prev) =>
+      prev.map((step) =>
+        step.stage === activeChainStage ? { ...step, status: 'failed' } : step
+      )
+    );
+    onAnswerRecorded(false, false);
+    triggerHaptic('error');
+    setShowResultFlash(true);
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+    flashTimeoutRef.current = window.setTimeout(() => setShowResultFlash(false), 650);
+
+    if (question.isSurvivalMode) {
+      setSurvivalHp((prev) => {
+        const next = Math.max(0, prev - 1);
+        if (next === 0) {
+          setSummaryModal({
+            isOpen: true,
+            status: 'game-over',
+            title: 'GAME OVER',
+            subtitle: 'Nyawa Anda telah habis akibat kehabisan waktu di Blitz Mode!',
+          });
+        }
+        return next;
+      });
+    }
+  }, [isAnswered, activeChainStage, onAnswerRecorded, question.isSurvivalMode, maxBlitzTime]);
+
+  // Blitz mode timer countdown: ONLY starts once video is playing!
+  useEffect(() => {
+    if (!question.isBlitzMode || isAnswered || summaryModal?.isOpen) return;
+    if (activeMove?.video_url && !isVideoPlaying) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 0.05) {
+          clearInterval(timer);
+          handleTimeout();
+          return 0;
+        }
+        return Math.max(0, prev - 0.05);
+      });
+    }, 50);
+
+    return () => clearInterval(timer);
+  }, [question.isBlitzMode, isAnswered, summaryModal, handleTimeout, activeMove?.video_url, isVideoPlaying]);
+
+  const handleSelectButton = useCallback((button: ThrowBreakButton) => {
     if (isAnswered || !activeMove) return;
 
     setSelectedButton(button);
+
+    // Single play mode: replay video on answer
+    if (question.isSinglePlay && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
 
     const result = evaluateThrowBreak(activeMove, button);
     const isCorrect = result.status === 'escaped';
@@ -132,6 +218,22 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
       if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
       flashTimeoutRef.current = window.setTimeout(() => setShowResultFlash(false), 650);
       return;
+    }
+
+    // Survival Mode HP damage on fail
+    if (question.isSurvivalMode) {
+      setSurvivalHp((prev) => {
+        const next = Math.max(0, prev - 1);
+        if (next === 0) {
+          setSummaryModal({
+            isOpen: true,
+            status: 'game-over',
+            title: 'GAME OVER',
+            subtitle: 'Nyawa Anda telah habis! Bantingan tidak berhasil di-break.',
+          });
+        }
+        return next;
+      });
     }
 
     // 2. FAILED THIS STAGE:
@@ -189,9 +291,19 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
     setShowResultFlash(true);
     if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
     flashTimeoutRef.current = window.setTimeout(() => setShowResultFlash(false), 650);
-  };
+  }, [
+    isAnswered,
+    activeMove,
+    question.isSinglePlay,
+    question.isSurvivalMode,
+    question.throwDrillType,
+    activeChainStage,
+    activeFollowups,
+    oppChar,
+    onAnswerRecorded,
+  ]);
 
-  const handleNextAction = () => {
+  const handleNextAction = useCallback(() => {
     triggerHaptic('light');
     if (pendingContinuation) {
       // Advance to the continuation of this chain throw!
@@ -211,6 +323,10 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
       setPendingContinuation(null);
       setVerdictText(null);
 
+      const stageTime = 4.0 + Math.max(0, nextStageNum - 1) * 1.0;
+      setTimeLeft(stageTime);
+      setIsVideoPlaying(!nextMove.video_url);
+
       setChainHistory((prev) => [
         ...prev,
         {
@@ -226,14 +342,50 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
         videoRef.current.play().catch(() => {});
       }
     } else {
-      // Move to completely new question round
+      if (question.sessionScope === 'gauntlet' && question.gauntletIndex === question.gauntletTotal) {
+        setSummaryModal({
+          isOpen: true,
+          status: 'completed',
+          title: 'GAUNTLET TUNTAS!',
+          subtitle: `Selamat! Semua ${question.gauntletTotal} bantingan dalam tantangan Gauntlet berhasil Anda selesaikan.`,
+        });
+        return;
+      }
       onNextQuestion();
     }
-  };
+  }, [pendingContinuation, question.sessionScope, question.gauntletIndex, question.gauntletTotal, onNextQuestion]);
+
+  const handleRetryFromModal = useCallback(() => {
+    setSummaryModal(null);
+    setSurvivalHp(3);
+    if (onRetrySession) {
+      onRetrySession();
+    } else {
+      onNextQuestion();
+    }
+  }, [onRetrySession, onNextQuestion]);
 
   // Keyboard controls: 1, 2, 3 (for 1+2), and Space/Enter for Next Action
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (summaryModal?.isOpen) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleRetryFromModal();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setSummaryModal(null);
+          onBackToSetup();
+        }
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onBackToSetup();
+        return;
+      }
+
       if (isAnswered) {
         if (e.code === 'Space' || e.code === 'Enter') {
           e.preventDefault();
@@ -254,7 +406,14 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAnswered, pendingContinuation, activeMove, handleSelectButton, handleNextAction]);
+  }, [
+    isAnswered,
+    summaryModal,
+    handleRetryFromModal,
+    onBackToSetup,
+    handleSelectButton,
+    handleNextAction,
+  ]);
 
   const validBreaks = activeValidBreaks || ['1', '2'];
 
@@ -271,6 +430,70 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
             <Settings size={15} />
             <span>Ganti Setup</span>
           </button>
+        </div>
+
+        {/* HUD Modifiers & Badges */}
+        <div className="arena-nav-right">
+          {question.sessionScope === 'gauntlet' && (
+            <div className="hud-gauntlet-tag">
+              <Trophy size={14} className="text-gold" />
+              <span>GAUNTLET: {question.gauntletIndex ?? 1} / {question.gauntletTotal ?? 1}</span>
+            </div>
+          )}
+
+          {question.isSurvivalMode && (
+            <div className="hud-survival-tag">
+              <span className="hud-label">HP</span>
+              <div className="hud-hearts-row">
+                {[1, 2, 3].map((heartIndex) => (
+                  <span
+                    key={heartIndex}
+                    className={`hud-heart ${heartIndex <= survivalHp ? 'heart-full' : 'heart-empty'}`}
+                    title={heartIndex <= survivalHp ? 'Nyawa Aktif' : 'Nyawa Hilang'}
+                  >
+                    ♥
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {question.isSinglePlay && (
+            <span className="hud-mode-pill pill-singleplay">
+              <EyeOff size={13} />
+              <span>SINGLE PLAY</span>
+            </span>
+          )}
+
+          {question.isBlitzMode && (
+            <div className="hud-blitz-box">
+              <div className="hud-blitz-text">
+                <Timer size={13} className="text-amber" />
+                <span>
+                  BLITZ:{' '}
+                  {!isVideoPlaying && activeMove?.video_url
+                    ? `MEMUAT VIDEO (${maxBlitzTime.toFixed(1)}s)`
+                    : `${timeLeft.toFixed(1)}s`}
+                </span>
+              </div>
+              <div className="hud-blitz-bar-bg">
+                <div
+                  className="hud-blitz-bar-fill"
+                  style={{
+                    width: `${Math.max(0, (timeLeft / maxBlitzTime) * 100)}%`,
+                    background:
+                      !isVideoPlaying && activeMove?.video_url
+                        ? 'var(--warning-amber)'
+                        : timeLeft > maxBlitzTime * 0.5
+                        ? 'var(--electric-cyan)'
+                        : timeLeft > maxBlitzTime * 0.25
+                        ? 'var(--heihachi-gold)'
+                        : 'var(--devil-crimson)',
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -332,7 +555,13 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
                 ref={videoRef}
                 src={activeMove.video_url}
                 autoPlay
-                loop
+                loop={isAnswered || !question.isSinglePlay}
+                onPlaying={() => setIsVideoPlaying(true)}
+                onEnded={() => {
+                  if (question.isSinglePlay && !isAnswered) {
+                    videoRef.current?.pause();
+                  }
+                }}
                 muted={isVideoMuted}
                 playsInline
                 className="move-video"
@@ -425,10 +654,74 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
             className="btn-next btn-next-pulsing"
             onClick={handleNextAction}
           >
-            <span>{pendingContinuation ? `RONDE BERIKUTNYA (TAHAP ${pendingContinuation.nextStageNum})` : 'RONDE BERIKUTNYA'}</span>
+            <span>
+              {pendingContinuation
+                ? `RONDE BERIKUTNYA (TAHAP ${pendingContinuation.nextStageNum})`
+                : question.sessionScope === 'gauntlet' && question.gauntletIndex === question.gauntletTotal
+                ? 'Selesai & Lihat Hasil'
+                : 'RONDE BERIKUTNYA'}
+            </span>
             <ArrowRight size={18} />
             {!isMobile && <span className="kbd-hint">Space / Enter</span>}
           </button>
+        </div>
+      )}
+
+      {/* Session Summary Modal (Pop-up saat Gauntlet Tuntas atau Survival Game Over) */}
+      {summaryModal?.isOpen && (
+        <div className="session-summary-overlay animate-fade-in">
+          <div className="session-summary-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className={`summary-header-badge ${summaryModal.status === 'completed' ? 'badge-complete' : 'badge-gameover'}`}>
+              {summaryModal.status === 'completed' ? <Trophy size={34} /> : <XCircle size={34} />}
+            </div>
+            <h2 className="summary-title">{summaryModal.title}</h2>
+            <p className="summary-subtitle">{summaryModal.subtitle}</p>
+
+            <div className="summary-stats-grid">
+              <div className="summary-stat-box">
+                <span className="stat-num">{score?.totalAnswered || 0}</span>
+                <span className="stat-label">Total Bantingan</span>
+              </div>
+              <div className="summary-stat-box">
+                <span className="stat-num text-cyan">
+                  {score?.totalAnswered ? Math.round(((score.correctCount || 0) / score.totalAnswered) * 100) : 0}%
+                </span>
+                <span className="stat-label">Akurasi Break</span>
+              </div>
+              <div className="summary-stat-box">
+                <span className="stat-num text-gold">{score?.optimalCount || 0}</span>
+                <span className="stat-label">Break Sukses</span>
+              </div>
+              <div className="summary-stat-box">
+                <span className="stat-num text-green">{score?.bestStreak || 0}</span>
+                <span className="stat-label">Best Streak</span>
+              </div>
+            </div>
+
+            <div className="summary-actions-row">
+              <button
+                id="btn-summary-retry"
+                type="button"
+                className="btn-summary-retry"
+                onClick={handleRetryFromModal}
+              >
+                <RotateCcw size={16} />
+                <span>Ulangi (Retry)</span>
+              </button>
+              <button
+                id="btn-summary-exit"
+                type="button"
+                className="btn-summary-exit"
+                onClick={() => {
+                  setSummaryModal(null);
+                  onBackToSetup();
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Menu Utama / Setup</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -900,12 +1193,232 @@ export const ThrowBreakArena: React.FC<ThrowBreakArenaProps> = ({
           opacity: 0.45;
         }
 
+        /* HUD Badges & Modifiers */
+        .arena-nav-right {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .hud-gauntlet-tag {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-family: var(--font-display);
+          font-size: 0.75rem;
+          font-weight: 900;
+          color: var(--heihachi-gold);
+          background: rgba(255, 183, 3, 0.1);
+          border: 1px solid rgba(255, 183, 3, 0.3);
+          padding: 4px 10px;
+          border-radius: var(--radius-full);
+          letter-spacing: 0.04em;
+        }
+        .hud-survival-tag {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(255, 30, 86, 0.1);
+          border: 1px solid rgba(255, 30, 86, 0.3);
+          padding: 3px 10px;
+          border-radius: var(--radius-full);
+        }
+        .hud-survival-tag .hud-label {
+          font-size: 0.7rem;
+          font-weight: 900;
+          color: var(--devil-crimson);
+        }
+        .hud-hearts-row {
+          display: flex;
+          gap: 4px;
+          font-size: 1.05rem;
+          line-height: 1;
+        }
+        .hud-heart.heart-full {
+          color: var(--devil-crimson);
+          text-shadow: 0 0 8px rgba(255, 30, 86, 0.6);
+        }
+        .hud-heart.heart-empty {
+          color: rgba(255, 255, 255, 0.2);
+        }
+        .hud-mode-pill {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 0.72rem;
+          font-weight: 800;
+          padding: 3px 8px;
+          border-radius: var(--radius-full);
+        }
+        .pill-singleplay {
+          color: var(--electric-cyan);
+          background: rgba(0, 229, 255, 0.1);
+          border: 1px solid rgba(0, 229, 255, 0.25);
+        }
+        .hud-blitz-box {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 110px;
+        }
+        .hud-blitz-text {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-family: var(--font-display);
+          font-size: 0.75rem;
+          font-weight: 900;
+          color: var(--heihachi-gold);
+        }
+        .hud-blitz-bar-bg {
+          width: 100%;
+          height: 5px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
+          overflow: hidden;
+        }
+        .hud-blitz-bar-fill {
+          height: 100%;
+          transition: width 0.06s linear, background-color 0.2s;
+        }
+
+        /* Session Summary Modal */
+        .session-summary-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.82);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10000;
+          padding: 16px;
+        }
+        .session-summary-card {
+          background: #111420;
+          border: 1.5px solid rgba(255, 255, 255, 0.12);
+          border-radius: var(--radius-lg);
+          padding: 28px 24px;
+          max-width: 440px;
+          width: 100%;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+        }
+        .summary-header-badge {
+          width: 68px;
+          height: 68px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .badge-complete {
+          background: rgba(255, 183, 3, 0.15);
+          color: var(--heihachi-gold);
+          border: 2px solid var(--heihachi-gold);
+          box-shadow: 0 0 20px rgba(255, 183, 3, 0.3);
+        }
+        .badge-gameover {
+          background: rgba(255, 30, 86, 0.15);
+          color: var(--devil-crimson);
+          border: 2px solid var(--devil-crimson);
+          box-shadow: 0 0 20px rgba(255, 30, 86, 0.3);
+        }
+        .summary-title {
+          font-family: var(--font-display);
+          font-size: 1.6rem;
+          font-weight: 900;
+          color: #fff;
+          margin: 0;
+          letter-spacing: 0.05em;
+        }
+        .summary-subtitle {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          margin: 0;
+          line-height: 1.4;
+        }
+        .summary-stats-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          width: 100%;
+        }
+        .summary-stat-box {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: var(--radius-sm);
+          padding: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .summary-stat-box .stat-num {
+          font-family: var(--font-display);
+          font-size: 1.35rem;
+          font-weight: 900;
+          color: #fff;
+        }
+        .summary-stat-box .stat-label {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .summary-actions-row {
+          display: flex;
+          gap: 10px;
+          width: 100%;
+          margin-top: 6px;
+        }
+        .btn-summary-retry,
+        .btn-summary-exit {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 12px 14px;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-display);
+          font-size: 0.85rem;
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.15s ease-in-out;
+        }
+        .btn-summary-retry {
+          background: linear-gradient(135deg, #00e5ff 0%, #0088ff 100%);
+          color: #000;
+          border: none;
+        }
+        .btn-summary-retry:hover {
+          opacity: 0.95;
+          transform: translateY(-1px);
+        }
+        .btn-summary-exit {
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #fff;
+        }
+        .btn-summary-exit:hover {
+          background: rgba(255, 255, 255, 0.1);
+        }
 
         @media (max-width: 600px) {
           .arena-top-nav {
-            flex-direction: row;
-            align-items: center;
+            flex-direction: column;
+            align-items: stretch;
             gap: 8px;
+          }
+          .arena-nav-right {
+            justify-content: space-between;
+            width: 100%;
           }
           .arena-nav-left {
             display: flex;
