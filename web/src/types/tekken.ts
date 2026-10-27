@@ -5,6 +5,7 @@ export type CharacterName =
   | "Bryan"
   | "Claudio"
   | "Devil Jin"
+  | "Dragunov"
   | "Eddy"
   | "Feng"
   | "Hwoarang"
@@ -33,7 +34,10 @@ export type CharacterName =
   | "Yoshimitsu"
   | "Zafina"
   | "Heihachi"
-  | "Armor King";
+  | "Armor King"
+  | "Clive"
+  | "Fahkumram"
+  | "Kunimitsu";
 
 export interface Move {
   id: string;

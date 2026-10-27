@@ -99,95 +99,109 @@ export interface AttributeInfo {
 
 export const ATTRIBUTE_DIRECTORY: AttributeInfo[] = [
   {
+    code: 'PC',
+    fullName: 'Power Crush',
+    category: 'Move Property',
+    description: 'Serangan ber-armor yang menyerap serangan High dan Mid musuh saat startup tanpa terinterupsi.',
+    colorClass: 'attr-pc',
+  },
+  {
+    code: 'HOM',
+    fullName: 'Homing',
+    category: 'Move Property',
+    description: 'Serangan dengan pelacakan sudut penuh (full tracking) yang tidak bisa dihindari dengan sidestep maupun sidewalk.',
+    colorClass: 'attr-hom',
+  },
+  {
+    code: 'HEAT',
+    fullName: 'Heat Engager',
+    category: 'Move Property',
+    description: 'Gerakan pemicu aktivasi Heat State, serangan pemungkas Heat Smash, atau Heat Dash untuk ekstensi combo.',
+    colorClass: 'attr-heat',
+  },
+  {
+    code: 'TOR',
+    fullName: 'Tornado',
+    category: 'Move Property',
+    description: 'Efek putaran tubuh musuh di udara (tailspin) saat juggle untuk perpanjangan kombo atau transisi ke dinding arena.',
+    colorClass: 'attr-tor',
+  },
+  {
+    code: 'RHP',
+    fullName: 'Recoverable HP',
+    category: 'Move Property',
+    description: 'Menghasilkan atau mengikis bar darah abu-abu (recoverable health gauge) musuh atau memulihkan darah sendiri.',
+    colorClass: 'attr-rhp',
+  },
+  {
+    code: 'FC',
+    fullName: 'Force Crouch',
+    category: 'Move Property',
+    description: 'Serangan yang memaksa lawan berada dalam posisi jongkok setelah terkena hit (+c) atau block (-c). Lawan tidak bisa merespon dengan standing jab i10.',
+    colorClass: 'attr-fc',
+  },
+  {
+    code: 'WI',
+    fullName: 'Wall Interaction',
+    category: 'Move Property',
+    description: 'Interaksi komprehensif dinding arena: Wall Splat, Wall Crush, Wall Break, Balcony Break, atau Wall Blast.',
+    colorClass: 'attr-wi',
+  },
+  {
+    code: 'FI',
+    fullName: 'Floor Interaction',
+    category: 'Move Property',
+    description: 'Interaksi komprehensif lantai arena: dapat meruntuhkan lantai (Floor Break) atau memicu ledakan lantai (Floor Blast).',
+    colorClass: 'attr-fi',
+  },
+  {
+    code: 'TH',
+    fullName: 'Throw',
+    category: 'Move Property',
+    description: 'Serangan bantingan atau lemparan (normal throw, command grab, atau attack throw).',
+    colorClass: 'attr-th',
+  },
+  {
+    code: 'CH',
+    fullName: 'Counter Hit',
+    category: 'Move Property',
+    description: 'Memiliki nilai keunggulan frame khusus, efek stun, atau ekstensi combo saat berhasil mendaratkan Counter Hit.',
+    colorClass: 'attr-ch',
+  },
+  {
+    code: 'CHP',
+    fullName: 'Chip Damage',
+    category: 'Move Property',
+    description: 'Serangan yang tetap memberikan pengurangan darah (chip damage) meskipun ditahan atau di-block oleh musuh.',
+    colorClass: 'attr-chip',
+  },
+  {
+    code: 'JL',
+    fullName: 'Jails',
+    category: 'Move Property',
+    description: 'Rangkaian pukulan yang mengunci musuh dalam blockstun (lawan tidak bisa menunduk, menginterupsi, atau sidestep).',
+    colorClass: 'attr-jl',
+  },
+  {
+    code: 'PRY',
+    fullName: 'Parry',
+    category: 'Move Property',
+    description: 'Serangan atau stance yang memiliki pertahanan tangkisan otomatis (sabaki, punch/kick parry, atau attack reversal) saat startup.',
+    colorClass: 'attr-pry',
+  },
+  {
     code: 'HC',
     fullName: 'High Crush',
-    category: 'Evasion & Stance',
+    category: 'Move Property',
     description: 'Gerakan menunduk yang secara sistematis kebal / luput (evade) dari seluruh serangan berstatus High milik lawan.',
     colorClass: 'attr-hc',
   },
   {
     code: 'LC',
     fullName: 'Low Crush',
-    category: 'Evasion & Stance',
+    category: 'Move Property',
     description: 'Gerakan melompat yang secara sistematis kebal / luput (evade) dari seluruh serangan berstatus Low milik lawan.',
     colorClass: 'attr-lc',
-  },
-  {
-    code: 'FC',
-    fullName: 'Force Crouch',
-    category: 'Opponent State',
-    description: 'Serangan yang memaksa lawan berada dalam posisi jongkok setelah terkena hit (+c) atau block (-c). Lawan tidak bisa langsung melancarkan serangan standing tercepat (i10 jab).',
-    colorClass: 'attr-fc',
-  },
-  {
-    code: 'LNC',
-    fullName: 'Launcher',
-    category: 'Combo & Juggle',
-    description: 'Serangan yang melemparkan lawan ke udara (airborne) untuk membuka kombo juggle penuh dengan damage besar.',
-    colorClass: 'attr-lnc',
-  },
-  {
-    code: 'KND',
-    fullName: 'Knockdown',
-    category: 'Opponent State',
-    description: 'Serangan yang merobohkan musuh hingga jatuh ke tanah (downed state), memberikan situasi oki / wakeup pressure.',
-    colorClass: 'attr-knd',
-  },
-  {
-    code: 'HEAT',
-    fullName: 'Heat Engager',
-    category: 'Tekken 8 System',
-    description: 'Gerakan pemicu aktivasi Heat State (Heat Engager), serangan pemungkas Heat Smash, atau Heat Dash untuk ekstensi combo.',
-    colorClass: 'attr-heat',
-  },
-  {
-    code: 'PC',
-    fullName: 'Power Crush',
-    category: 'Defense & Armor',
-    description: 'Serangan ber-armor yang menyerap serangan High dan Mid musuh saat startup tanpa terinterupsi (rentan terhadap Low & Throw).',
-    colorClass: 'attr-pc',
-  },
-  {
-    code: 'TOR',
-    fullName: 'Tornado',
-    category: 'Combo & Juggle',
-    description: 'Efek putaran tubuh musuh di udara saat juggle yang memungkinkan perpanjangan kombo atau transisi ke dinding arena.',
-    colorClass: 'attr-tor',
-  },
-  {
-    code: 'HOM',
-    fullName: 'Homing',
-    category: 'Tracking',
-    description: 'Serangan dengan pelacakan sudut penuh (full tracking) yang tidak bisa dihindari lawan menggunakan sidestep atau sidewalk.',
-    colorClass: 'attr-hom',
-  },
-  {
-    code: 'SPK',
-    fullName: 'Spike',
-    category: 'Combo & Juggle',
-    description: 'Serangan yang membanting lawan dari udara langsung menancap ke lantai untuk grounded reset atau follow-up damage.',
-    colorClass: 'attr-spk',
-  },
-  {
-    code: 'WI',
-    fullName: 'Wall Interaction',
-    category: 'Stage Interaction',
-    description: 'Gerakan yang memiliki interaksi dengan tembok atau panggung arena (dapat memicu Wall Splat, Wall Crush, Wall Break, Balcony Break, atau Wall Blast tergantung stage).',
-    colorClass: 'attr-wi',
-  },
-  {
-    code: 'FI',
-    fullName: 'Floor Interaction',
-    category: 'Stage Interaction',
-    description: 'Gerakan ini dapat meruntuhkan lantai atau memicu floor blast tergantung panggung arena.',
-    colorClass: 'attr-fi',
-  },
-  {
-    code: 'CHIP',
-    fullName: 'Chip Damage',
-    category: 'Damage Property',
-    description: 'Serangan yang tetap memberikan pengurangan darah (chip damage) meskipun ditahan / di-block oleh musuh.',
-    colorClass: 'attr-chip',
   },
 ];
 
@@ -203,7 +217,9 @@ export function extractCleanFrame(rawStr?: string | null): string {
 }
 
 /**
- * Extracts Tekken 8 gameplay properties (High Crush, Low Crush, Knockdown, Launcher, etc.)
+ * Extracts Tekken 8 move properties based on Wavu Wiki data.
+ * Note: Launcher and Knockdown badges are intentionally excluded because launch/knockdown status
+ * is represented directly and accurately by numeric frame advantage (+39a, KND, etc.).
  */
 export function getMoveAttributes(move: Move): MoveAttributeBadge[] {
   const badges: MoveAttributeBadge[] = [];
@@ -213,10 +229,177 @@ export function getMoveAttributes(move: Move): MoveAttributeBadge[] {
   const cleanHit = extractCleanFrame(lowerHit);
   const lowerBlock = (move.block || '').toLowerCase();
   const cleanBlock = extractCleanFrame(lowerBlock);
-  const lowerCh = (move.ch || '').toLowerCase();
-  const cleanCh = extractCleanFrame(lowerCh);
+  const lowerTarget = (move.target || '').toLowerCase();
 
-  // 1. High Crush (HC) - Karakter menunduk di bawah serangan High
+  // 1. Power Crush (PC)
+  if (lowerNotes.includes('power crush') || lowerNotes.includes('power-crush')) {
+    badges.push({ code: 'PC', label: 'Power Crush (Serangan ber-armor menyerap pukulan)', colorClass: 'attr-pc' });
+  }
+
+  // 2. Homing (HOM)
+  if (lowerNotes.includes('homing')) {
+    badges.push({ code: 'HOM', label: 'Homing (Serangan melacak musuh yang sidestep)', colorClass: 'attr-hom' });
+  }
+
+  // 3. Heat Engager (HEAT)
+  if (
+    lowerNotes.includes('heat engager') ||
+    lowerNotes.includes('heat dash') ||
+    lowerNotes.includes('heat smash') ||
+    lowerNotes.includes('heat burst')
+  ) {
+    badges.push({ code: 'HEAT', label: 'Heat Engager (Mengaktifkan mode Heat)', colorClass: 'attr-heat' });
+  }
+
+  // 4. Tornado (TOR)
+  if (lowerNotes.includes('tornado') || lowerNotes.includes('sat') || lowerNotes.includes('tailspin')) {
+    badges.push({ code: 'TOR', label: 'Tornado (Putaran combo perpanjangan juggle)', colorClass: 'attr-tor' });
+  }
+
+  // 5. Recoverable HP (RHP)
+  if (
+    lowerNotes.includes('recoverable-gauge') ||
+    lowerNotes.includes('recoverable health') ||
+    lowerNotes.includes('recoverable hp') ||
+    lowerNotes.includes('restores recoverable health')
+  ) {
+    badges.push({ code: 'RHP', label: 'Recoverable HP (Berinteraksi dengan bar darah abu-abu)', colorClass: 'attr-rhp' });
+  }
+
+  // 6. Force Crouch (FC)
+  const isCrouchHit =
+    /\d+c(?:g)?(?:\b|~|\s|\]|\)|$)/i.test(cleanHit) ||
+    cleanHit.endsWith('c') ||
+    cleanHit.includes('crouch');
+
+  const isCrouchBlock =
+    /\d+c(?:g)?(?:\b|~|\s|\]|\)|$)/i.test(cleanBlock) ||
+    cleanBlock.endsWith('c') ||
+    cleanBlock.includes('crouch');
+
+  const isCrouchNotes =
+    lowerNotes.includes('opponent recovers crouching') ||
+    lowerNotes.includes('recovers crouching') ||
+    lowerNotes.includes('recovers crouched') ||
+    lowerNotes.includes('forces the opponent to crouch') ||
+    lowerNotes.includes('forces crouch');
+
+  if (isCrouchHit || isCrouchBlock || isCrouchNotes) {
+    badges.push({ code: 'FC', label: 'Force Crouch (Memaksa lawan dalam posisi jongkok)', colorClass: 'attr-fc' });
+  }
+
+  // 7. Wall Interaction (WI)
+  const isWallInteraction =
+    lowerNotes.includes('wall splat') ||
+    lowerNotes.includes('wall-splat') ||
+    lowerNotes.includes('wallsplat') ||
+    lowerNotes.includes('wall crush') ||
+    lowerNotes.includes('wall-crush') ||
+    lowerNotes.includes('wall bounce') ||
+    lowerNotes.includes('balcony-break') ||
+    lowerNotes.includes('balcony break') ||
+    lowerNotes.includes('wall-break') ||
+    lowerNotes.includes('wall break') ||
+    lowerNotes.includes('wall blast') ||
+    lowerNotes.includes('wall-blast') ||
+    cleanHit.includes('wall');
+
+  if (isWallInteraction) {
+    badges.push({ code: 'WI', label: 'Wall Interaction (Interaksi Tembok / Panggung)', colorClass: 'attr-wi' });
+  }
+
+  // 8. Floor Interaction (FI)
+  const isFloorInteraction =
+    lowerNotes.includes('floor-break') ||
+    lowerNotes.includes('floor break') ||
+    lowerNotes.includes('floorbreak') ||
+    lowerNotes.includes('floor-blast') ||
+    lowerNotes.includes('floor blast') ||
+    lowerNotes.includes('floorblast');
+
+  if (isFloorInteraction) {
+    badges.push({ code: 'FI', label: 'Floor Interaction (Interaksi Lantai / Panggung)', colorClass: 'attr-fi' });
+  }
+
+  // 9. Throw (TH)
+  const isThrow =
+    lowerTarget.includes('th') ||
+    lowerNotes.includes('throw on hit') ||
+    lowerNotes.includes('attack throw') ||
+    lowerNotes.includes('command grab') ||
+    lowerNotes.includes('throw break');
+  if (isThrow) {
+    badges.push({ code: 'TH', label: 'Throw (Bantingan / Lemparan)', colorClass: 'attr-th' });
+  }
+
+  // 10. Counter Hit (CH)
+  if (move.ch && move.ch.trim() !== '' && move.ch.trim() !== '-') {
+    badges.push({ code: 'CH', label: `Counter Hit (${move.ch})`, colorClass: 'attr-ch' });
+  }
+
+  // 11. Chip Damage (CHP)
+  if (lowerNotes.includes('chip') || lowerNotes.includes('chip damage')) {
+    badges.push({ code: 'CHP', label: 'Chip Damage (Mengikis darah saat di-block)', colorClass: 'attr-chip' });
+  }
+
+  // 12. Jails (JL)
+  const hasJailWord = lowerNotes.includes('jail');
+  if (hasJailWord) {
+    const isExplicitNotJail =
+      lowerNotes.includes('does not jail') ||
+      lowerNotes.includes("doesn't jail") ||
+      lowerNotes.includes('not jail');
+    const isDuckable =
+      lowerNotes.includes('duckable') ||
+      lowerNotes.includes('can be ducked');
+    const isInputsOnly =
+      lowerNotes.includes('jails attack inputs') &&
+      !lowerNotes.includes('jail from 1st block') &&
+      !lowerNotes.includes('jail from 2nd block');
+    const isBlockJail =
+      lowerNotes.includes('jail from 1st block') ||
+      lowerNotes.includes('jails from 1st block') ||
+      lowerNotes.includes('jail from 2nd block') ||
+      lowerNotes.includes('jails from 2nd block') ||
+      lowerNotes.includes('jail from 3rd block') ||
+      lowerNotes.includes('jail from 1st attack') ||
+      lowerNotes.includes('jail from 2nd attack') ||
+      lowerNotes.includes('jails on block') ||
+      lowerNotes.includes('jailing') ||
+      lowerNotes.includes('* jails') ||
+      lowerNotes.includes('\njails');
+
+    if (!isExplicitNotJail && !isDuckable && !isInputsOnly && isBlockJail) {
+      badges.push({ code: 'JL', label: 'Jails (Lawan terkunci penuh dalam blockstun)', colorClass: 'attr-jl' });
+    }
+  }
+
+  // 13. Parry (PRY)
+  if (lowerNotes.includes('parry') || lowerNotes.includes('sabaki') || lowerNotes.includes('reversal')) {
+    const isNotActualParry =
+      lowerNotes.includes('reversal-break') ||
+      lowerNotes.includes('unparryable') ||
+      lowerNotes.includes('cannot be parried') ||
+      lowerNotes.includes("can't be parried") ||
+      lowerNotes.includes('parryable');
+
+    const isActualParry =
+      lowerNotes.includes('sabaki') ||
+      lowerNotes.includes('parries') ||
+      lowerNotes.includes('power parry') ||
+      lowerNotes.includes('punch parry') ||
+      lowerNotes.includes('kick parry') ||
+      lowerNotes.includes('low parry') ||
+      lowerNotes.includes('parry window') ||
+      lowerNotes.includes('parry frames') ||
+      lowerNotes.includes('successful parry');
+
+    if (isActualParry && !isNotActualParry) {
+      badges.push({ code: 'PRY', label: 'Parry (Tangkisan otomatis / Sabaki saat startup)', colorClass: 'attr-pry' });
+    }
+  }
+
+  // 14. High Crush (HC)
   const isDuckableByOpponent =
     lowerNotes.includes('duckable') ||
     lowerNotes.includes('can be ducked') ||
@@ -242,7 +425,7 @@ export function getMoveAttributes(move: Move): MoveAttributeBadge[] {
     badges.push({ code: 'HC', label: 'High Crush (Menunduk di bawah serangan High)', colorClass: 'attr-hc' });
   }
 
-  // 2. Low Crush (LC) - Karakter melompat di atas serangan Low
+  // 15. Low Crush (LC)
   if (
     lowerInput.startsWith('uf+') ||
     lowerInput.startsWith('u+') ||
@@ -258,115 +441,6 @@ export function getMoveAttributes(move: Move): MoveAttributeBadge[] {
     lowerNotes.includes('evade low')
   ) {
     badges.push({ code: 'LC', label: 'Low Crush (Melompat di atas serangan Low)', colorClass: 'attr-lc' });
-  }
-
-  // 3. Launcher (LNC) - Musuh terlempar ke udara untuk juggle
-  const isAirborneHit = /\d+a(?:\b|~|\s|\]|\)|$)/i.test(cleanHit);
-  if (move.is_launcher || isAirborneHit || cleanHit.includes('launch') || cleanCh.includes('launch') || lowerNotes.includes('launcher')) {
-    badges.push({ code: 'LNC', label: 'Launcher (Musuh melayang untuk combo juggle)', colorClass: 'attr-lnc' });
-  }
-
-  // 4. Knockdown (KND) - Musuh jatuh roboh ke lantai
-  const isDowned =
-    /\d+d(?:\b|~|\s|\]|\)|$)/i.test(cleanHit) ||
-    cleanHit.includes('knd') ||
-    cleanHit.includes('fufa') ||
-    cleanHit.includes('fdfa') ||
-    cleanHit.includes('fdft') ||
-    cleanHit.includes('knockdown') ||
-    lowerNotes.includes('knockdown');
-  if (isDowned && !badges.some((b) => b.code === 'LNC')) {
-    badges.push({ code: 'KND', label: 'Knockdown (Musuh roboh ke tanah)', colorClass: 'attr-knd' });
-  }
-
-  // 5. Heat Engager (HEAT)
-  if (
-    lowerNotes.includes('heat engager') ||
-    lowerNotes.includes('heat dash') ||
-    lowerNotes.includes('heat smash') ||
-    lowerNotes.includes('heat burst')
-  ) {
-    badges.push({ code: 'HEAT', label: 'Heat Engager (Mengaktifkan mode Heat)', colorClass: 'attr-heat' });
-  }
-
-  // 6. Power Crush (PC)
-  if (lowerNotes.includes('power crush') || lowerNotes.includes('power-crush')) {
-    badges.push({ code: 'PC', label: 'Power Crush (Serangan ber-armor menyerap pukulan)', colorClass: 'attr-pc' });
-  }
-
-  // 7. Tornado (TOR)
-  if (lowerNotes.includes('tornado') || lowerNotes.includes('sat') || lowerNotes.includes('tailspin')) {
-    badges.push({ code: 'TOR', label: 'Tornado (Putaran combo perpanjangan juggle)', colorClass: 'attr-tor' });
-  }
-
-  // 8. Homing (HOM)
-  if (lowerNotes.includes('homing')) {
-    badges.push({ code: 'HOM', label: 'Homing (Serangan melacak musuh yang sidestep)', colorClass: 'attr-hom' });
-  }
-
-  // 9. Force Crouch (FC) - Memaksa lawan jongkok (pada Hit atau Block)
-  const isCrouchHit =
-    /\d+c(?:g)?(?:\b|~|\s|\]|\)|$)/i.test(cleanHit) ||
-    cleanHit.endsWith('c') ||
-    cleanHit.includes('crouch');
-
-  const isCrouchBlock =
-    /\d+c(?:g)?(?:\b|~|\s|\]|\)|$)/i.test(cleanBlock) ||
-    cleanBlock.endsWith('c') ||
-    cleanBlock.includes('crouch');
-
-  const isCrouchNotes =
-    lowerNotes.includes('opponent recovers crouching') ||
-    lowerNotes.includes('recovers crouching') ||
-    lowerNotes.includes('recovers crouched') ||
-    lowerNotes.includes('forces the opponent to crouch') ||
-    lowerNotes.includes('forces crouch');
-
-  if (isCrouchHit || isCrouchBlock || isCrouchNotes) {
-    badges.push({ code: 'FC', label: 'Force Crouch (Memaksa lawan dalam posisi jongkok)', colorClass: 'attr-fc' });
-  }
-
-  // 10. Spike (SPK) - Membanting musuh di udara ke lantai
-  if (lowerNotes.includes('spike')) {
-    badges.push({ code: 'SPK', label: 'Spike (Membanting musuh di udara ke lantai)', colorClass: 'attr-spk' });
-  }
-
-  // 11. Wall Interaction (WI) - Menggabungkan Wall Splat, Wall Crush, Balcony Break, Wall Break, Wall Blast
-  const isWallInteraction =
-    lowerNotes.includes('wall splat') ||
-    lowerNotes.includes('wall-splat') ||
-    lowerNotes.includes('wallsplat') ||
-    lowerNotes.includes('wall crush') ||
-    lowerNotes.includes('wall-crush') ||
-    lowerNotes.includes('wall bounce') ||
-    lowerNotes.includes('balcony-break') ||
-    lowerNotes.includes('balcony break') ||
-    lowerNotes.includes('wall-break') ||
-    lowerNotes.includes('wall break') ||
-    lowerNotes.includes('wall blast') ||
-    lowerNotes.includes('wall-blast') ||
-    cleanHit.includes('wall');
-
-  if (isWallInteraction) {
-    badges.push({ code: 'WI', label: 'Wall Interaction (Interaksi Tembok / Panggung)', colorClass: 'attr-wi' });
-  }
-
-  // 12. Floor Interaction (FI) - Menggabungkan Floor Break dan Floor Blast
-  const isFloorInteraction =
-    lowerNotes.includes('floor-break') ||
-    lowerNotes.includes('floor break') ||
-    lowerNotes.includes('floorbreak') ||
-    lowerNotes.includes('floor-blast') ||
-    lowerNotes.includes('floor blast') ||
-    lowerNotes.includes('floorblast');
-
-  if (isFloorInteraction) {
-    badges.push({ code: 'FI', label: 'Floor Interaction (Interaksi Lantai / Panggung)', colorClass: 'attr-fi' });
-  }
-
-  // 13. Chip Damage (CHIP)
-  if (lowerNotes.includes('chip damage')) {
-    badges.push({ code: 'CHIP', label: 'Chip Damage (Mengikis darah musuh saat di-block)', colorClass: 'attr-chip' });
   }
 
   return badges;

@@ -919,6 +919,7 @@ export const FrameExplorer: React.FC<FrameExplorerProps> = ({ onBack }) => {
       {selectedDetailMove && (
         <MoveDetailModal
           move={selectedDetailMove}
+          spreadsheetMoves={sortedMoves}
           allCharacterMoves={moves}
           characterName={selectedChar}
           favorites={currentCharFavs}

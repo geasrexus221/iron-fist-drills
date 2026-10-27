@@ -12,7 +12,7 @@ if sys.platform == 'win32':
 
 API_URL = "https://wavu.wiki/w/api.php"
 
-# All 35 Characters in Tekken 8
+# All 37 Characters in Tekken 8 Trainer
 ROSTER_CONFIG = [
     {"name": "Alisa", "id_prefix": "Alisa", "title": "Automaton of Destruction", "style": "Thruster-based High Mobility", "avatar": "AL", "color": "#ec4899"},
     {"name": "Asuka", "id_prefix": "Asuka", "title": "Spirited Peacemaker", "style": "Kazama Style Traditional Martial Arts", "avatar": "AS", "color": "#3b82f6"},
@@ -20,6 +20,7 @@ ROSTER_CONFIG = [
     {"name": "Bryan", "id_prefix": "Bryan", "title": "Harbinger of Chaos", "style": "Kickboxing", "avatar": "BR", "color": "#94a3b8"},
     {"name": "Claudio", "id_prefix": "Claudio", "title": "The Banishing Archer", "style": "Sirius Style Exorcism Arts", "avatar": "CL", "color": "#06b6d4"},
     {"name": "Devil Jin", "id_prefix": "Devil Jin", "title": "Black Wings of Ruin", "style": "Unknown", "avatar": "DJ", "color": "#8b5cf6"},
+    {"name": "Dragunov", "id_prefix": "Dragunov", "title": "White Reaper", "style": "Commando Sambo", "avatar": "DR", "color": "#64748b"},
     {"name": "Eddy", "id_prefix": "Eddy", "title": "Indomitable Flash", "style": "Capoeira", "avatar": "ED", "color": "#eab308"},
     {"name": "Feng", "id_prefix": "Feng", "title": "God Fist", "style": "God Fist Style Chinese Martial Arts", "avatar": "FG", "color": "#ea580c"},
     {"name": "Hwoarang", "id_prefix": "Hwoarang", "title": "Blood Talon", "style": "Taekwondo", "avatar": "HW", "color": "#ef4444"},
@@ -49,6 +50,9 @@ ROSTER_CONFIG = [
     {"name": "Zafina", "id_prefix": "Zafina", "title": "Mystic Stargazer", "style": "Ancient Assassination Arts", "avatar": "ZF", "color": "#7c3aed"},
     {"name": "Heihachi", "id_prefix": "Heihachi", "title": "King of Iron Fist", "style": "Mishima Style Karate", "avatar": "HH", "color": "#ffaa00"},
     {"name": "Armor King", "id_prefix": "Armor King", "title": "Dark Black Jaguar", "style": "Shoot Wrestling", "avatar": "AK", "color": "#a855f7"},
+    {"name": "Clive", "id_prefix": "Clive", "title": "First Shield of Rosaria", "style": "Combat Arts & Eikonic Powers", "avatar": "CR", "color": "#dc2626"},
+    {"name": "Fahkumram", "id_prefix": "Fahkumram", "title": "Roaring Muay Thai Champion", "style": "Muay Thai", "avatar": "FK", "color": "#10b981"},
+    {"name": "Kunimitsu", "id_prefix": "Kunimitsu", "title": "Fox-Masked Ninja", "style": "Manji Ninjutsu Urban Style", "avatar": "KN", "color": "#f43f5e"},
 ]
 
 def get_file_name(char_name):

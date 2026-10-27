@@ -72,6 +72,18 @@
     "launcher_count": 0
   },
   {
+    "name": "Dragunov",
+    "title": "White Reaper",
+    "style": "Commando Sambo",
+    "avatar": "DR",
+    "color": "#64748b",
+    "file": "dragunov.json",
+    "total_moves": 141,
+    "video_count": 87,
+    "punishable_count": 46,
+    "launcher_count": 1
+  },
+  {
     "name": "Eddy",
     "title": "Indomitable Flash",
     "style": "Capoeira",
@@ -418,5 +430,41 @@
     "video_count": 10,
     "punishable_count": 54,
     "launcher_count": 0
+  },
+  {
+    "name": "Clive",
+    "title": "First Shield of Rosaria",
+    "style": "Combat Arts & Eikonic Powers",
+    "avatar": "CR",
+    "color": "#dc2626",
+    "file": "clive.json",
+    "total_moves": 122,
+    "video_count": 64,
+    "punishable_count": 55,
+    "launcher_count": 2
+  },
+  {
+    "name": "Fahkumram",
+    "title": "Roaring Muay Thai Champion",
+    "style": "Muay Thai",
+    "avatar": "FK",
+    "color": "#10b981",
+    "file": "fahkumram.json",
+    "total_moves": 144,
+    "video_count": 35,
+    "punishable_count": 48,
+    "launcher_count": 0
+  },
+  {
+    "name": "Kunimitsu",
+    "title": "Fox-Masked Ninja",
+    "style": "Manji Ninjutsu Urban Style",
+    "avatar": "KN",
+    "color": "#f43f5e",
+    "file": "kunimitsu.json",
+    "total_moves": 167,
+    "video_count": 0,
+    "punishable_count": 63,
+    "launcher_count": 1
   }
 ]

@@ -46,6 +46,10 @@ function favoritesApiPlugin(): Plugin {
     Zafina: [],
     Heihachi: [],
     'Armor King': [],
+    Dragunov: [],
+    Clive: [],
+    Fahkumram: [],
+    Kunimitsu: [],
   }
 
   return {

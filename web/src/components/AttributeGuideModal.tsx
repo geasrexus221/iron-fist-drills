@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, Info } from 'lucide-react';
 import { ATTRIBUTE_DIRECTORY } from '../utils/notation';
 
 export interface AttributeGuideModalProps {
@@ -26,9 +26,11 @@ export const AttributeGuideModal: React.FC<AttributeGuideModalProps> = ({ isOpen
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="attr-guide-modal-card animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        {/* Header: Judul & Tombol Tutup Saja */}
+        {/* Header */}
         <div className="attr-guide-header">
-          <span className="attr-guide-simple-title">Kepanjangan Atribut</span>
+          <div className="attr-guide-title-wrap">
+            <span className="attr-guide-simple-title">Panduan & Kepanjangan Atribut</span>
+          </div>
           <button
             type="button"
             className="btn-close-modal"
@@ -39,16 +41,27 @@ export const AttributeGuideModal: React.FC<AttributeGuideModalProps> = ({ isOpen
           </button>
         </div>
 
-        {/* Daftar Singkatan & Kepanjangan */}
-        <div className="attr-simple-grid-scroll">
-          {ATTRIBUTE_DIRECTORY.map((item) => (
-            <div key={item.code} className="attr-simple-row">
-              <span className={`attr-badge ${item.colorClass} attr-simple-badge`}>
-                {item.code}
-              </span>
-              <span className="attr-simple-fullname">{item.fullName}</span>
-            </div>
-          ))}
+        {/* Modal Scroll Content */}
+        <div className="attr-guide-scroll-container">
+          <div className="attr-guide-section-label">Move Properties</div>
+          <div className="attr-simple-grid-scroll">
+            {ATTRIBUTE_DIRECTORY.map((item) => (
+              <div key={item.code} className="attr-simple-row" title={item.description}>
+                <span className={`attr-badge ${item.colorClass} attr-simple-badge`}>
+                  {item.code}
+                </span>
+                <span className="attr-simple-fullname">{item.fullName}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Info Tip Note tentang Launcher & Knockdown */}
+          <div className="attr-guide-tip-note">
+            <Info size={13} className="inline-block mr-1 text-sky-400 shrink-0 mt-0.5" />
+            <span>
+              <strong>Catatan:</strong> Status Launcher (+XXa) dan Knockdown (KND) dibaca langsung dari angka keunggulan frame di kolom HIT/CH.
+            </span>
+          </div>
         </div>
 
         {/* Footer */}

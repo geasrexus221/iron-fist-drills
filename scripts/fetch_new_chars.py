@@ -5,7 +5,7 @@ import re
 import os
 import time
 
-NEW_CHARACTERS = ["King", "Armor King"]
+NEW_CHARACTERS = ["Kunimitsu", "Fahkumram"]
 API_URL = "https://wavu.wiki/w/api.php"
 
 def fetch_moves_for_character(char_name):

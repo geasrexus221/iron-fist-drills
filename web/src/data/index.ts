@@ -4,6 +4,7 @@ import azucenaData from './azucena.json';
 import bryanData from './bryan.json';
 import claudioData from './claudio.json';
 import devilJinData from './devil_jin.json';
+import dragunovData from './dragunov.json';
 import eddyData from './eddy.json';
 import fengData from './feng.json';
 import hwoarangData from './hwoarang.json';
@@ -33,6 +34,9 @@ import yoshimitsuData from './yoshimitsu.json';
 import zafinaData from './zafina.json';
 import heihachiData from './heihachi.json';
 import armorKingData from './armor_king.json';
+import cliveData from './clive.json';
+import fahkumramData from './fahkumram.json';
+import kunimitsuData from './kunimitsu.json';
 
 import { cleanNotation } from '../utils/notation';
 import type { CharacterName, Move } from '../types/tekken';
@@ -177,6 +181,7 @@ export const CHARACTER_DATA: Record<CharacterName, Move[]> = {
   Bryan: preprocessMoves(bryanData),
   Claudio: preprocessMoves(claudioData),
   'Devil Jin': preprocessMoves(devilJinData),
+  Dragunov: preprocessMoves(dragunovData),
   Eddy: preprocessMoves(eddyData),
   Feng: preprocessMoves(fengData),
   Hwoarang: preprocessMoves(hwoarangData),
@@ -206,6 +211,9 @@ export const CHARACTER_DATA: Record<CharacterName, Move[]> = {
   Zafina: preprocessMoves(zafinaData),
   Heihachi: preprocessMoves(heihachiData),
   'Armor King': preprocessMoves(armorKingData),
+  Clive: preprocessMoves(cliveData),
+  Fahkumram: preprocessMoves(fahkumramData),
+  Kunimitsu: preprocessMoves(kunimitsuData),
 };
 
 export const CHARACTERS: { name: CharacterName; title: string; style: string; avatar: string; color: string }[] = [
@@ -215,6 +223,7 @@ export const CHARACTERS: { name: CharacterName; title: string; style: string; av
   { name: 'Bryan', title: 'Harbinger of Chaos', style: 'Kickboxing', avatar: 'BR', color: '#94a3b8' },
   { name: 'Claudio', title: 'Banishing Archer', style: 'Sirius Exorcism Arts', avatar: 'CL', color: '#06b6d4' },
   { name: 'Devil Jin', title: 'Black Wings of Ruin', style: 'Unknown Power', avatar: 'DJ', color: '#8b5cf6' },
+  { name: 'Dragunov', title: 'White Reaper', style: 'Commando Sambo', avatar: 'DR', color: '#64748b' },
   { name: 'Eddy', title: 'Indomitable Flash', style: 'Capoeira', avatar: 'ED', color: '#eab308' },
   { name: 'Feng', title: 'God Fist', style: 'Chinese Martial Arts', avatar: 'FG', color: '#ea580c' },
   { name: 'Hwoarang', title: 'Blood Talon', style: 'Taekwondo', avatar: 'HW', color: '#ef4444' },
@@ -244,4 +253,7 @@ export const CHARACTERS: { name: CharacterName; title: string; style: string; av
   { name: 'Zafina', title: 'Mystic Stargazer', style: 'Ancient Assassination', avatar: 'ZF', color: '#7c3aed' },
   { name: 'Heihachi', title: 'King of Iron Fist', style: 'Mishima Karate', avatar: 'HH', color: '#ffaa00' },
   { name: 'Armor King', title: 'Dark Black Jaguar', style: 'Shoot Wrestling', avatar: 'AK', color: '#a855f7' },
+  { name: 'Clive', title: 'First Shield of Rosaria', style: 'Combat Arts & Eikonic Powers', avatar: 'CR', color: '#dc2626' },
+  { name: 'Fahkumram', title: 'Roaring Muay Thai Champion', style: 'Muay Thai', avatar: 'FK', color: '#10b981' },
+  { name: 'Kunimitsu', title: 'Fox-Masked Ninja', style: 'Manji Ninjutsu Urban Style', avatar: 'KN', color: '#f43f5e' },
 ];

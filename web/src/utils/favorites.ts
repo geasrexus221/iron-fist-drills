@@ -9,6 +9,7 @@ export const DEFAULT_FAVORITES: FavoritesMap = {
   Bryan: [],
   Claudio: [],
   'Devil Jin': [],
+  Dragunov: [],
   Eddy: [],
   Feng: [],
   Hwoarang: [],
@@ -38,6 +39,9 @@ export const DEFAULT_FAVORITES: FavoritesMap = {
   Zafina: [],
   Heihachi: [],
   'Armor King': [],
+  Clive: [],
+  Fahkumram: [],
+  Kunimitsu: [],
 };
 
 const STORAGE_KEY = 't8_favorites_backup';

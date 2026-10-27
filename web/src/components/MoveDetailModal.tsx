@@ -14,12 +14,13 @@ import {
   detectCleanHit,
   hasDistinctCounterHit,
 } from '../utils/notation';
-import { X, Play, ChevronUp, ChevronDown, Info, ArrowLeft } from 'lucide-react';
+import { X, Play, ChevronUp, ChevronDown, Info, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AttributeGuideModal } from './AttributeGuideModal';
 import { OptionGuideModal } from './OptionGuideModal';
 
 export interface MoveDetailModalProps {
   move: Move;
+  spreadsheetMoves?: Move[];
   allCharacterMoves: Move[];
   characterName: CharacterName;
   onClose: () => void;
@@ -28,7 +29,7 @@ export interface MoveDetailModalProps {
   onToggleFavorite?: (id: string) => void;
 }
 
-type SortField = 'input' | 'name' | 'startup';
+type SortField = 'input' | 'target' | 'startup' | 'block' | 'hit';
 type SortDirection = 'asc' | 'desc';
 
 interface SortConfig {
@@ -44,6 +45,7 @@ interface ScenarioTabItem {
 
 export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
   move: initialMove,
+  spreadsheetMoves,
   allCharacterMoves,
   characterName,
   onClose,
@@ -55,13 +57,21 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
   // Navigation history to allow going back to previously inspected moves
   const [history, setHistory] = useState<Move[]>([]);
 
+  // Sibling options when navigating inside a follow-up option move
+  const [optionSiblings, setOptionSiblings] = useState<Move[]>([]);
+
   // Sync state if initialMove prop changes
   useEffect(() => {
     setCurrentMove(initialMove);
     setHistory([]);
+    setOptionSiblings([]);
   }, [initialMove.id]);
 
   const handleSelectNewMove = (newMove: Move) => {
+    // If navigating from root into first level follow-up, capture current sorted moves as siblings
+    if (history.length === 0) {
+      setOptionSiblings(sortedMoves);
+    }
     setHistory((prev) => [...prev, currentMove]);
     setCurrentMove(newMove);
     setActiveVideoMove(newMove);
@@ -74,6 +84,9 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
     if (history.length === 0) return;
     const prevMove = history[history.length - 1];
     setHistory((prev) => prev.slice(0, prev.length - 1));
+    if (history.length <= 1) {
+      setOptionSiblings([]);
+    }
     setCurrentMove(prevMove);
     setActiveVideoMove(prevMove);
     setScenario('hit');
@@ -148,16 +161,6 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
     setStanceFilter('all');
   }, [currentMove.id]);
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   // Parse numeric frame advantage from string or number field
   const parseNum = (valStr?: string | null, valNum?: number | null): number | null => {
@@ -180,8 +183,8 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
     return hitAdvantage;
   }, [scenario, hitAdvantage, blockAdvantage, chAdvantage, specialCrouch, specialClean]);
 
-  // Sub-filter for stance when transition is optional: 'all' | 'normal' | 'stance'
-  const [stanceFilter, setStanceFilter] = useState<'all' | 'normal' | 'stance'>('all');
+  // Sub-filter for stance when transition is optional: 'all' | 'stance'
+  const [stanceFilter, setStanceFilter] = useState<'all' | 'stance'>('all');
 
   // Situational state checks
   const transitions = useMemo(() => detectStanceTransitions(currentMove), [currentMove]);
@@ -280,10 +283,6 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
     });
   }, [allCharacterMoves, currentMove.id, currentAdvantage, opponentArrival, accessibleStanceCodes, hasMandatoryStance, isPlayerCrouch, isGrounded, scenario, isForcedCrouch]);
 
-  const normalMovesCount = useMemo(() => {
-    return validMoves.filter((m) => getCandidateStancePrefix(m.input) === null).length;
-  }, [validMoves]);
-
   const stanceMovesCount = useMemo(() => {
     return validMoves.filter((m) => {
       const p = getCandidateStancePrefix(m.input);
@@ -292,9 +291,6 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
   }, [validMoves, accessibleStanceCodes]);
 
   const filteredMoves = useMemo(() => {
-    if (stanceFilter === 'normal') {
-      return validMoves.filter((m) => getCandidateStancePrefix(m.input) === null);
-    }
     if (stanceFilter === 'stance') {
       return validMoves.filter((m) => {
         const p = getCandidateStancePrefix(m.input);
@@ -314,13 +310,26 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
       if (field === 'input') {
         return factor * a.input.localeCompare(b.input, undefined, { numeric: true, sensitivity: 'base' });
       }
-      if (field === 'name') {
-        return factor * a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      if (field === 'target') {
+        return factor * (a.target || '').localeCompare(b.target || '', undefined, { sensitivity: 'base' });
       }
       if (field === 'startup') {
-        const sA = a.startup_num ?? 99;
-        const sB = b.startup_num ?? 99;
-        return factor * (sA - sB);
+        if (a.startup_num === null && b.startup_num === null) return 0;
+        if (a.startup_num === null) return 1;
+        if (b.startup_num === null) return -1;
+        return factor * (a.startup_num - b.startup_num);
+      }
+      if (field === 'block') {
+        if (a.block_num === null && b.block_num === null) return 0;
+        if (a.block_num === null) return 1;
+        if (b.block_num === null) return -1;
+        return factor * (a.block_num - b.block_num);
+      }
+      if (field === 'hit') {
+        if (a.hit_num === null && b.hit_num === null) return 0;
+        if (a.hit_num === null) return 1;
+        if (b.hit_num === null) return -1;
+        return factor * (a.hit_num - b.hit_num);
       }
       return 0;
     });
@@ -346,6 +355,68 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
       </span>
     );
   };
+
+  // Contextual Next / Prev Navigation
+  const isFollowUpMode = history.length > 0 && optionSiblings.length > 0;
+  const effectiveSpreadsheetMoves = useMemo(() => {
+    return spreadsheetMoves && spreadsheetMoves.length > 0 ? spreadsheetMoves : allCharacterMoves;
+  }, [spreadsheetMoves, allCharacterMoves]);
+
+  const activeNavList = isFollowUpMode ? optionSiblings : effectiveSpreadsheetMoves;
+  const currentNavIndex = useMemo(() => {
+    return activeNavList.findIndex((m) => m.id === currentMove.id);
+  }, [activeNavList, currentMove.id]);
+
+  const hasPrev = currentNavIndex > 0;
+  const hasNext = currentNavIndex >= 0 && currentNavIndex < activeNavList.length - 1;
+
+  const goToPrev = () => {
+    if (!hasPrev) return;
+    const targetMove = activeNavList[currentNavIndex - 1];
+    if (!isFollowUpMode) {
+      setHistory([]);
+      setOptionSiblings([]);
+    }
+    setCurrentMove(targetMove);
+    setActiveVideoMove(targetMove);
+    setScenario('hit');
+    setStanceFilter('all');
+    onSelectMove?.(targetMove);
+  };
+
+  const goToNext = () => {
+    if (!hasNext) return;
+    const targetMove = activeNavList[currentNavIndex + 1];
+    if (!isFollowUpMode) {
+      setHistory([]);
+      setOptionSiblings([]);
+    }
+    setCurrentMove(targetMove);
+    setActiveVideoMove(targetMove);
+    setScenario('hit');
+    setStanceFilter('all');
+    onSelectMove?.(targetMove);
+  };
+
+  // Keyboard navigation: Escape to close, ArrowLeft for Prev, ArrowRight for Next
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isAttrGuideOpen || isOptionGuideOpen) return;
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNext();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, hasPrev, hasNext, currentNavIndex, activeNavList, isFollowUpMode, isAttrGuideOpen, isOptionGuideOpen]);
 
   const activeVideoUrl = activeVideoMove?.video_url;
 
@@ -512,13 +583,6 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
                   </button>
                   <button
                     type="button"
-                    className={`stance-subfilter-btn ${stanceFilter === 'normal' ? 'active' : ''}`}
-                    onClick={() => setStanceFilter('normal')}
-                  >
-                    Berdiri ({normalMovesCount})
-                  </button>
-                  <button
-                    type="button"
                     className={`stance-subfilter-btn ${stanceFilter === 'stance' ? 'active' : ''}`}
                     onClick={() => setStanceFilter('stance')}
                   >
@@ -531,7 +595,7 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
               <div className="sheet-micro-badges-group">
                 {isForcedCrouch && (
                   <span className="micro-badge micro-badge-fc" title="Lawan dalam posisi jongkok (Force Crouch), respon tercepat ws+4 i11">
-                    FC (i11)
+                    FC
                   </span>
                 )}
                 {isGrounded && (
@@ -559,9 +623,9 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
                 <thead>
                   <tr>
                     <th
-                      className={`th-sortable ${sortConfig?.field === 'input' ? 'th-active-sort' : ''}`}
-                      style={{ width: '115px' }}
+                      className={`th-sortable th-input ${sortConfig?.field === 'input' ? 'th-active-sort' : ''}`}
                       onClick={() => handleSort('input')}
+                      title="Sortir berdasarkan Input"
                     >
                       <div className="th-header-inner">
                         <span>INPUT</span>
@@ -569,69 +633,146 @@ export const MoveDetailModal: React.FC<MoveDetailModalProps> = ({
                       </div>
                     </th>
                     <th
-                      className={`th-sortable ${sortConfig?.field === 'name' ? 'th-active-sort' : ''}`}
-                      onClick={() => handleSort('name')}
+                      className={`th-sortable th-target ${sortConfig?.field === 'target' ? 'th-active-sort' : ''}`}
+                      onClick={() => handleSort('target')}
+                      title="Sortir berdasarkan Target Serangan"
                     >
-                      <div className="th-header-inner">
-                        <span>NAMA GERAKAN</span>
-                        {renderSortIndicator('name')}
+                      <div className="th-header-inner th-header-center">
+                        <span>TARGET</span>
+                        {renderSortIndicator('target')}
                       </div>
                     </th>
                     <th
-                      className={`th-sortable ${sortConfig?.field === 'startup' ? 'th-active-sort' : ''}`}
-                      style={{ width: '85px', textAlign: 'right' }}
+                      className={`th-sortable th-startup ${sortConfig?.field === 'startup' ? 'th-active-sort' : ''}`}
                       onClick={() => handleSort('startup')}
+                      title="Sortir berdasarkan Kecepatan Startup"
                     >
-                      <div className="th-header-inner" style={{ justifyContent: 'flex-end' }}>
+                      <div className="th-header-inner th-header-center">
                         <span>STARTUP</span>
                         {renderSortIndicator('startup')}
+                      </div>
+                    </th>
+                    <th
+                      className={`th-sortable th-block ${sortConfig?.field === 'block' ? 'th-active-sort' : ''}`}
+                      onClick={() => handleSort('block')}
+                      title="Sortir berdasarkan Frame Block"
+                    >
+                      <div className="th-header-inner th-header-center">
+                        <span>BLOCK</span>
+                        {renderSortIndicator('block')}
+                      </div>
+                    </th>
+                    <th
+                      className={`th-sortable th-hit ${sortConfig?.field === 'hit' ? 'th-active-sort' : ''}`}
+                      onClick={() => handleSort('hit')}
+                      title="Sortir berdasarkan Frame Hit"
+                    >
+                      <div className="th-header-inner th-header-center">
+                        <span>HIT</span>
+                        {renderSortIndicator('hit')}
                       </div>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedMoves.map((m) => (
-                    <tr
-                      key={m.id}
-                      className="option-row"
-                      onClick={() => handleSelectNewMove(m)}
-                      title={`Buka detail dan opsi gerakan ${m.name} (${m.input})`}
-                    >
-                      <td className="td-input">
-                        <div className="input-cell-content">
-                          <span className="input-badge">{m.input}</span>
-                          {(() => {
-                            const p = getCandidateStancePrefix(m.input);
-                            if (p && accessibleStanceCodes.has(p)) {
-                              const tr = transitions.find((t) => t.stance === p);
-                              return (
-                                <span
-                                  className="row-stance-chip"
-                                  title={`Jurus dari stance ${p}${tr?.trigger ? ` (input: ${tr.trigger})` : ''}`}
-                                >
-                                  {p}{tr?.trigger ? ` (${tr.trigger})` : ''}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </td>
-                      <td className="td-name">
-                        <div className="name-cell">
-                          <span className="name-text">{m.name}</span>
-                          {m.video_url && <Play size={10} className="row-play-hint" />}
-                        </div>
-                      </td>
-                      <td className="td-startup" style={{ textAlign: 'right' }}>
-                        <span className="text-cyan font-bold">{formatStartup(m.startup, m.startup_num)}</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {sortedMoves.map((m) => {
+                    const targetClass = m.target?.toLowerCase().includes('sm')
+                      ? 'target-sm'
+                      : m.target?.toLowerCase().includes('l')
+                      ? 'target-l'
+                      : m.target?.toLowerCase().includes('m')
+                      ? 'target-m'
+                      : 'target-h';
+
+                    const blockNum = m.block_num;
+                    const isPunishable = blockNum !== null && blockNum !== undefined && blockNum <= -10;
+                    const isPlus = blockNum !== null && blockNum !== undefined && blockNum > 0;
+
+                    return (
+                      <tr
+                        key={m.id}
+                        className="option-row"
+                        onClick={() => handleSelectNewMove(m)}
+                        title={`Buka detail dan opsi gerakan ${m.name} (${m.input})`}
+                      >
+                        <td className="td-input">
+                          <div className="input-cell-content">
+                            <span className="input-badge">{m.input}</span>
+                            {(() => {
+                              const p = getCandidateStancePrefix(m.input);
+                              if (p && accessibleStanceCodes.has(p)) {
+                                const tr = transitions.find((t) => t.stance === p);
+                                return (
+                                  <span
+                                    className="row-stance-chip"
+                                    title={`Jurus dari stance ${p}${tr?.trigger ? ` (input: ${tr.trigger})` : ''}`}
+                                  >
+                                    {p}{tr?.trigger ? ` (${tr.trigger})` : ''}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                            {m.video_url && <Play size={10} className="row-play-hint" />}
+                          </div>
+                        </td>
+                        <td className="td-target">
+                          {m.target ? <span className={targetClass}>{m.target}</span> : <span className="text-muted">-</span>}
+                        </td>
+                        <td className="td-startup">
+                          <span className="text-cyan font-bold">{formatStartup(m.startup, m.startup_num)}</span>
+                        </td>
+                        <td className="td-block">
+                          <span className={isPunishable ? 'text-crimson font-bold' : isPlus ? 'text-cyan font-bold' : 'text-neutral'}>
+                            {m.block || '-'}
+                          </span>
+                        </td>
+                        <td className="td-hit">
+                          <span className="text-green font-bold">
+                            {m.hit || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
           </div>
+        </div>
+
+        {/* Bottom Sticky Footer Navigation Bar */}
+        <div className="sheet-modal-footer">
+          <button
+            type="button"
+            className="btn-sheet-nav btn-sheet-nav-prev"
+            onClick={goToPrev}
+            disabled={!hasPrev}
+            title="Gerakan sebelumnya (Panah Kiri)"
+          >
+            <ChevronLeft size={13} />
+            <span className="nav-btn-text">Prev</span>
+          </button>
+
+          <div className="sheet-nav-status">
+            <span className="sheet-nav-label">
+              {isFollowUpMode ? 'Opsi Follow-up' : 'Spreadsheet'}
+            </span>
+            <span className="sheet-nav-counter">
+              {currentNavIndex >= 0 ? currentNavIndex + 1 : 1} / {activeNavList.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn-sheet-nav btn-sheet-nav-next"
+            onClick={goToNext}
+            disabled={!hasNext}
+            title="Gerakan berikutnya (Panah Kanan)"
+          >
+            <span className="nav-btn-text">Next</span>
+            <ChevronRight size={13} />
+          </button>
         </div>
       </div>
 
